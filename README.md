@@ -7,6 +7,7 @@
     <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> -->
 	TMIO LOGO
   </a>
+</div>
 
 
 This repository contains the TMIO source code.
