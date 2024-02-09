@@ -1,17 +1,35 @@
+<!-- # tmio -->
+![license][license.bedge]
+![Coveralls branch](https://img.shields.io/coverallsCoverage/github/tuda-parallel/TMIO)
+![GitHub Release](https://img.shields.io/github/v/release/tuda-parallel/TMIO)
+![issues](https://img.shields.io/github/issues/tuda-parallel/TMIO)
+![contributors](https://img.shields.io/github/contributors/tuda-parallel/TMIO)
+![c++][c++.bedge]
+ 
 
-![license][license.bedge] &emsp; ![coverage][coverage.badge] &emsp;![pipline][pipeline.badge] 
 <br />
-
 <div align="center">
-  <a href="https://git.rwth-aachen.de/parallel/tmio">
-    <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> -->
-	TMIO LOGO
-  </a>
+  <h1 align="center">TMIO</h1>
+  <p align="center">
+ <h3 align="center"> Tracing MPI-IO </h2>
+    <a href="https://git.rwth-aachen.de/parallel/TMIO">View Demo</a>
+    ·
+    <a href="https://github.com/tuda-parallel/TMIO/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/tuda-parallel/TMIO/issues">Request Feature</a>
+  </p>
+</div>
 
+This repository contains the TMIO source code. TMIO is a C++ tracing library that can be easily 
+attached to existing code to monitor MPI-IO online. The tool traces synchronous as well as asynchronous I/O.
+TMIO offers a C as well as a c++ interface.
+We provide two methods for linking the library to the application, depending on whether the information is used for [offline](#offline-analysis) or [online](#online-analysis) analysis. 
 
-This repository contains the TMIO source code.
-- For installation, see [Installation](#installation)
-- See the list of updates here: [Latest News](#latest-news)
+The generated file can be easily examined with all provided tools from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to: 
+1. find the period of the I/O phases [offline](https://github.com/tuda-parallel/FTIO#usage) or [online](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction)
+2. visualize the results with [`ioplot`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot)
+3. parse using [`ioparse`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioparse) several trace files to a single profile to examine with [Extra-P](https://github.com/extra-p/extrap)
+
 
 
 <!-- TABLE OF CONTENTS -->
@@ -19,19 +37,17 @@ This repository contains the TMIO source code.
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
       <a href="#getting-started">Getting Started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
+		<li><a href="#testing">Testing</a></li>
       </ul>
-    </li>
-    <li><a href="#quick-start">Usage</a></li>
+    <li><a href="#Usage">Usage</a></li>
+	<ul>
+        <li><a href="#offline-tracing">Offline Tracing</a></li>
+        <li><a href="#online-tracing">Online Tracing</a></li>
+      </ul>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#contact">Contact</a></li>
@@ -40,209 +56,79 @@ This repository contains the TMIO source code.
   </ol>
 </details>
 
-## About The Project
-
-`TMIO` stand for **T**echniques for **M**PI. **I**/**O**.
-`TMIO` contains a tracing library that allows to monitor online MPI I/O. 
-
-For any questions, feel free to contact me: <ahmad.tarraf@tu-darmstadt.de>
-
-### Built With
-The project was build with C and C++.
-
-- ![c++][c++.bedge]
-- ![c][c.bedge]
-
-## Latest News
-
-- no update yet
+see latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tree/main/ChangeLog.md)
 
 ## Getting Started
 ### Prerequisites
 - MPI
+- G++
+
+<p align="right"><a href="#tmio">⬆</a></p>
 
 ### Installation
 Go to the build directory:
-```
+```sh
 cd build
 ```
 Build the library using the Makefile.
-The library can be build with or without msgpack:
+The library can be built with or without MessagePack:
 - Standard :
-	```
+	``` sh
 	make library
 	```
 
-- Msgpack support:
-	```
+- MessagePack support:
+	```sh
 	make msgpack_library
 	```
 
-Options can be passed with flags or through the file `./include/iofalgs.h` or through the Makefile variables. 
+Options can be passed with flags to the `make` command or through the file [`./include/ioflags.h`](https://github.com/tuda-parallel/TMIO/tree/main/include/ioflags.h).
+
+<p align="right"><a href="#tmio">⬆</a></p>
 
 ### Testing
-To test the library, run:
-```
-make
+To test the the library works execute:
+``` sh
 make clean
+make 
+```
+
+To test the MessagePack support, call:
+``` sh
 make msgpack
 ```
 
+<p align="right"><a href="#tmio">⬆</a></p>
+
 ## Usage
 There are 2 ways to use this library to trace I/O: **offline** or **online** tracing.
-### Offline Tracing:
-For offline tracing, the `LD_PRELOAD` mechanism is used. First, build the library with either msgpack support or not (see [Installation](#installation)).
+
+<p align="right"><a href="#tmio">⬆</a></p>
+
+### Offline Analysis:
+
+The offline mode uses the LD_PRELOAD mechanism.
+The offline mode uses the LD_PRELOAD mechanism. Upon MPI Finalize, the collected data is written to a single file to be analyzed later. 
+In the online mode, the application is compiled with the TMIO library and a line is added to indicate when
+to flush the results out to a file (JSON Lines or MessagePack). 
+
+
+For offline tracing, the `LD_PRELOAD` mechanism is used. First, build the library with either MessagePack support or not (see [Installation](#installation)).
 After that, just call:
 ```
 LD_PRELOAD=path_to_lib/libtmio.so $(MPIRUN)  -np $(PROCS) $(MPI_RUN_FLAGS) ./your_code variable_1 variable_2
 ```
 
-### Online Tracing:
-The code needs to be compiled with the library. Let's take IOR as an example. 
+### Online Analysis:
+The code needs to be compiled with the library. 
 
-#### IOR Example:
-clone ior:
-``` bash
-git clone git@github.com:hpc/ior.git
-```
-In `src/` modify the Makefile as following:
+An example on how to modify IOR is provided [here](/examples/IOR/README.md#instructions)
 
-1. Add this line:
-	``` make
-	TMIO_DIR = /d/git/tarraf/tmio
-	```
-2. Add to LIBS the TMIO lib:
-	``` make
-	LIBS = ... -ltmio
-	```
-3. Add a call for building the library:
-	``` make
-	shared_lib: 
-		cd $(TMIO_DIR)/build && make library ; cd -
-		cp $(TMIO_DIR)/build/libtmio.so libtmio.so
-	``` 
-4. Add include dir:
-	``` make
-	DEFAULT_INCLUDES = -I.  -I$(TMIO_DIR)/include
-	DEFS = ... -DINCLUDE
-	```
-5. Add LDFLAGS:
-	``` make
-	LDFLAGS =  -L. -Wl,-rpath,$(PWD)
-	```
-6. Add to the all target:
-	``` make
-	all: config.h shared_lib
-	```
 
-Next modify either ior.c or aiori-MPIIO.c to include the lib. For ior.c:
 
-``` c
-#ifdef INCLUDE
-#include "tmio_c.h"
-#endif 
-
-// (Somewhere, for example at the end of the file add:)
-#ifdef INCLUDE
-if (access == READ){
-		iotrace_summary();}
-#endif
-return (dataMoved);
-```
-
-Finally, in ior root directory, call:
-``` bash
-make
-```
-
-If everything is right, libtmio.so should be created in the ./src folder of ior. 
-Moreover, git diff on ior.c should show:
-``` diff 
-+#ifdef INCLUDE
-+#include "tmio_c.h"
-+#endif 
-+
- enum {
-         IOR_TIMER_OPEN_START,
-         IOR_TIMER_OPEN_STOP,
-@@ -1869,5 +1873,9 @@ static IOR_offset_t WriteOrRead(IOR_param_t *test, IOR_results_t *results,
-           aligned_buffer_free(randomPrefillBuffer, test->gpuMemoryFlags);
-         }
- 
-+               #ifdef INCLUDE
-+               if (access == READ){
-+                               iotrace_summary();}
-+               #endif
-         return (dataMoved);
-
-```
-
-Git diff on the Makefile should show:
-``` diff
-+TMIO_DIR = /d/git/tarraf/tmio
- 
-@@ -501,7 +505,7 @@ AM_V_at = $(am__v_at_$(V))
- am__v_at_ = $(am__v_at_$(AM_DEFAULT_VERBOSITY))
- am__v_at_0 = @
- am__v_at_1 = 
--DEFAULT_INCLUDES = -I.
-+DEFAULT_INCLUDES = -I. -I$(TMIO_DIR)/include
- depcomp = $(SHELL) $(top_srcdir)/config/depcomp
- am__maybe_remake_depfiles = depfiles
- am__depfiles_remade = ./$(DEPDIR)/IOR-aiori-CEPHFS.Po \
-
-@@ -735,7 +739,7 @@ CPPFLAGS =  -Icheck/include -Icheck/include
- CSCOPE = cscope
- CTAGS = ctags
- CYGPATH_W = echo
--DEFS = -DHAVE_CONFIG_H
-+DEFS = -DHAVE_CONFIG_H -DINCLUDE
- DEPDIR = .deps
- ECHO_C = 
- ECHO_N = -n
-
-@@ -747,12 +751,12 @@ INSTALL_DATA = ${INSTALL} -m 644
- INSTALL_PROGRAM = ${INSTALL}
- INSTALL_SCRIPT = ${INSTALL}
- INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
--LDFLAGS =  -Lcheck/lib64 -Lcheck/lib -Wl,--enable-new-dtags -Wl,-rpath=check/lib64:check/lib -Lcheck/lib64 -Lcheck/lib -Wl,--enable-new-dtags -Wl,-rpath=check/lib64:check/lib
-+LDFLAGS =  -Lcheck/lib64 -Lcheck/lib -Wl,--enable-new-dtags -Wl,-rpath=check/lib64:check/lib -Lcheck/lib64 -Lcheck/lib -Wl,--enable-new-dtags -Wl,-rpath=check/lib64:check/lib -L. -Wl,-rpath,$(PWD)
-LIBOBJS = 
--LIBS = -lm 
-+LIBS = -lm -ltmio
- LTLIBOBJS = 
- MAINT = #
-
-@@ -880,7 +884,7 @@ MDTEST_LDFLAGS = $(mdtest_LDFLAGS)
- MDTEST_LDADD = $(mdtest_LDADD)
- MDTEST_CPPFLAGS = $(mdtest_CPPFLAGS)
- libaiori_a_CPPFLAGS = $(extraCPPFLAGS)
--all: config.h
-+all: config.h shared_lib
-        $(MAKE) $(AM_MAKEFLAGS) all-recursive
-
-@@ -3721,3 +3725,8 @@ build.conf:
- # Tell versions [3.59,3.63) of GNU make to not export all variables.
- # Otherwise a system limit (for SysV at least) may be exceeded.
- .NOEXPORT:
-+
-+
-+shared_lib: 
-+               cd $(TMIO_DIR)/build && make library ; cd -
-+               cp $(TMIO_DIR)/build/libtmio.so libtmio.so
-+               
-```
-
-Now you can run it. On the cluster call for example:
-``` bash
-srun ./ior  -N ${SLURM_NPROCS} -t 2m -b 10m -s 2 -i 8 -a MPIIO
-```
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
-Don't forget to give the project a star! Thanks again!
+If you have a suggestion that would make this better, please fork the repo and create a pull request.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -250,28 +136,60 @@ Don't forget to give the project a star! Thanks again!
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+<p align="right"><a href="#tmio">⬆</a></p>
 
-
-
+<!-- CONTACT -->
 ## Contact
-Ahmad Tarraf
-- ahmad.tarraf@tu-darmstadt.de 
-- [![][parallel.bedge]][parallel_website]
 
-Project Link: [https://git.rwth-aachen.de/parallel/tmio](https://git.rwth-aachen.de/parallel/tmio)
+[![][parallel.bedge]][parallel_website]
 
+- Ahmad Tarraf: <ahmad.tarraf@tu-darmstadt.de>
 
+<p align="right"><a href="#tmio">⬆</a></p>
 
 ## License
 
-Distributed under the BSD 3-Clause License. See `LICENSE` for more information.
+![license][license.bedge]
 
+Distributed under the BSD 3-Clause License. See [LISCENCE](./LICENSE) for more information.
+<p align="right"><a href="#tmio">⬆</a></p>
 
+<!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
-Authors: 
-  - Ahmad Tarraf
 
-Publication:
+Authors:
+
+- Ahmad Tarraf
+- Add your name here
+
+
+<p align="right"><a href="#tmio">⬆</a></p>
+
+## Citation
+
+```
+ @inproceedings{Tarraf_Bandet_Boito_Pallez_Wolf_2024, 
+  author={Tarraf, Ahmad and Bandet, Alexis and Boito, Francieli and Pallez, Guillaume and Wolf, Felix},
+  title={Capturing Periodic I/O Using Frequency Techniques}, 
+  booktitle={2024 IEEE International Parallel and Distributed Processing Symposium (IPDPS)}, 
+  address={San Francisco, CA, USA}, 
+  year={2024},
+  month=may, 
+  pages={1–14}, 
+  notes = {(accepted)}
+ }
+```
+
+<p align="right"><a href="#tmio">⬆</a></p>
+
+## Publications
+
+1. A. Tarraf, A. Bandet, F. Boito, G. Pallez, and F. Wolf, “Capturing Periodic I/O Using Frequency Techniques,” in 2024 IEEE International Parallel and Distributed Processing Symposium (IPDPS), San Francisco, CA, USA, May 2024, pp. 1–14.
+<p align="right"><a href="#tmio">⬆</a></p>
+
+
+
+
 
 [pipeline.badge]: https://git.rwth-aachen.de/parallel/tmio/badges/main/pipeline.svg
 [coverage.badge]: https://git.rwth-aachen.de/parallel/tmio/badges/main/coverage.svg
