@@ -9,6 +9,7 @@
 
 <br />
 <div align="center">
+<<<<<<< HEAD
   <h1 align="center">TMIO</h1>
   <p align="center">
  <h3 align="center"> Tracing MPI-IO </h2>
@@ -18,6 +19,12 @@
     ·
     <a href="https://github.com/tuda-parallel/TMIO/issues">Request Feature</a>
   </p>
+=======
+  <a href="https://git.rwth-aachen.de/parallel/tmio">
+    <!-- <img src="images/logo.png" alt="Logo" width="80" height="80"> -->
+	TMIO LOGO
+  </a>
+>>>>>>> 7164f7c0e48b28b83caada547e33d4a13711323f
 </div>
 
 This repository contains the TMIO source code. TMIO is a C++ tracing library that can be easily 
