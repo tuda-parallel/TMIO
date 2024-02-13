@@ -1,11 +1,17 @@
 <!-- # tmio -->
-![license][license.bedge]
-![Coveralls branch](https://img.shields.io/coverallsCoverage/github/tuda-parallel/TMIO)
+
+
 ![GitHub Release](https://img.shields.io/github/v/release/tuda-parallel/TMIO)
-![issues](https://img.shields.io/github/issues/tuda-parallel/TMIO)
+![GitHub Release](https://img.shields.io/github/release-date/tuda-parallel/TMIO)
+![](https://img.shields.io/github/last-commit/tuda-parallel/TMIO)
 ![contributors](https://img.shields.io/github/contributors/tuda-parallel/TMIO)
-![c++][c++.bedge]
- 
+![issues](https://img.shields.io/github/issues/tuda-parallel/TMIO)
+![](https://img.shields.io/github/languages/code-size/tuda-parallel/TMIO)
+![](https://img.shields.io/github/languages/top/tuda-parallel/TMIO)
+![license][license.bedge]
+
+
+
 
 <br />
 <div align="center">
@@ -158,9 +164,8 @@ Distributed under the BSD 3-Clause License. See [LISCENCE](./LICENSE) for more i
 ## Acknowledgments
 
 Authors:
-
 - Ahmad Tarraf
-- Add your name here
+
 
 
 <p align="right"><a href="#tmio">⬆</a></p>
