@@ -110,26 +110,39 @@ Note that, the online version was developed to work with the [`predictor`](https
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Offline Analysis:
-
-
-
-
 For offline tracing, the `LD_PRELOAD` mechanism is used. First, build the library with either MessagePack support or not (see [Installation](#installation)).
 After that, just call:
-```
+```sh
 LD_PRELOAD=path_to_lib/libtmio.so $(MPIRUN)  -np $(PROCS) $(MPI_RUN_FLAGS) ./your_code variable_1 variable_2
 ```
 
-### Online Analysis:
-The code needs to be compiled with the library. 
+<p align="right"><a href="#tmio">⬆</a></p>
 
-An example on how to modify IOR is provided [here](/examples/IOR/README.md#instructions)
+### Online Analysis:
+The code needs to be compiled with the library ([IOR example](/examples/IOR/README.md#instructions)). Basically, three steps need to be performed:
+  1. The library needs to be included in the code: 
+		```C++
+		// Somewhere at the beginning of the code
+			#include "tmio_c.h"
+		```
+  2. A single line needs to be added indicating when to flush the data out. Whenever this line is reached, the collected traces are flushed out to the tracing file:
+		```C++
+		// Somewhere in the code
+		iotrace_summary();
+	   	```
+  3. The application needs to be recompiled for the changes to take effect
+
+An example on how to modify IOR is provided [here](/examples/IOR/README.md#instructions).
+
+<p align="right"><a href="#tmio">⬆</a></p>
 
 ## Exploring the Traces:
-The generated file can be easily examined with all provided tools from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to: 
-1. find the period of the I/O phases [offline](https://github.com/tuda-parallel/FTIO#usage) or [online](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction)
-2. visualize the traced results with [`ioplot`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot)
-3. Use [`ioparse`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioparse) to merge several traces into a single profile that can be examined with [Extra-P](https://github.com/extra-p/extrap)
+The generated file can be easily examined with all provided tools from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to:
+  1. Find the period of the I/O phases [offline](https://github.com/tuda-parallel/FTIO#usage) or [online](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction)
+  2. Visualize the traced results with [`ioplot`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot)
+  3. Use [`ioparse`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioparse) to merge several traces into a single profile that can be examined with [Extra-P](https://github.com/extra-p/extrap)
+
+<p align="right"><a href="#tmio">⬆</a></p>
 
 ## Contributing
 
