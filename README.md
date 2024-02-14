@@ -1,6 +1,4 @@
 <!-- # tmio -->
-
-
 ![GitHub Release](https://img.shields.io/github/v/release/tuda-parallel/TMIO)
 ![GitHub Release](https://img.shields.io/github/release-date/tuda-parallel/TMIO)
 ![](https://img.shields.io/github/last-commit/tuda-parallel/TMIO)
@@ -26,15 +24,11 @@
   </p>
 </div>
 
-This repository contains the TMIO source code. TMIO is a C++ tracing library that can be easily 
+This repository contains the TMIO source code. TMIO is a C++ tracing library that can be easily
 attached to existing code to monitor MPI-IO online. The tool traces synchronous as well as asynchronous I/O.
-TMIO offers a C as well as a c++ interface.
-We provide two methods for linking the library to the application, depending on whether the information is used for [offline](#offline-analysis) or [online](#online-analysis) analysis. 
-
-The generated file can be easily examined with all provided tools from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to: 
-1. find the period of the I/O phases [offline](https://github.com/tuda-parallel/FTIO#usage) or [online](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction)
-2. visualize the results with [`ioplot`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot)
-3. parse using [`ioparse`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioparse) several trace files to a single profile to examine with [Extra-P](https://github.com/extra-p/extrap)
+TMIO offers a C as well as a C++ interface.
+We provide two methods for linking the library to the application, depending on whether the information is used for [offline](#offline-analysis) or [online](#online-analysis) analysis.
+The obtained traces can be analyzed as explained here [Exploring the Traces](#exploring-the-traces).
 
 
 
@@ -54,7 +48,7 @@ The generated file can be easily examined with all provided tools from the [FTIO
         <li><a href="#offline-tracing">Offline Tracing</a></li>
         <li><a href="#online-tracing">Online Tracing</a></li>
       </ul>
-    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#exploring-the-traces">Exploring the Traces</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#license">License</a></li>
@@ -67,7 +61,7 @@ see latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tre
 ## Getting Started
 ### Prerequisites
 - MPI
-- G++
+- MsgPack (installed automatically see [Installation](#installation))
 
 <p align="right"><a href="#tmio">⬆</a></p>
 
@@ -93,7 +87,7 @@ Options can be passed with flags to the `make` command or through the file [`./i
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Testing
-To test the the library works execute:
+To test that the library works execute:
 ``` sh
 make clean
 make 
@@ -107,16 +101,17 @@ make msgpack
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ## Usage
-There are 2 ways to use this library to trace I/O: **offline** or **online** tracing.
+There are two ways to use this library to trace I/O: **offline** or **online** tracing.
+The offline mode uses the `LD_PRELOAD` mechanism. Upon `MPI_Finalize`, the collected data is written into a single that can be analyzed using the tools from [here](#exploring-the-traces).
+In the online mode, the application is compiled with the TMIO library, and a line is added to indicate when
+to flush the results out to a file (JSON Lines or MessagePack). The same set of tools can be used in both modes. 
+Note that, the online version was developed to work with the [`predictor`](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction) tool from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to detect the period of the I/O phases during the execution of an application. 
 
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Offline Analysis:
 
-The offline mode uses the LD_PRELOAD mechanism.
-The offline mode uses the LD_PRELOAD mechanism. Upon MPI Finalize, the collected data is written to a single file to be analyzed later. 
-In the online mode, the application is compiled with the TMIO library and a line is added to indicate when
-to flush the results out to a file (JSON Lines or MessagePack). 
+
 
 
 For offline tracing, the `LD_PRELOAD` mechanism is used. First, build the library with either MessagePack support or not (see [Installation](#installation)).
@@ -130,7 +125,11 @@ The code needs to be compiled with the library.
 
 An example on how to modify IOR is provided [here](/examples/IOR/README.md#instructions)
 
-
+## Exploring the Traces:
+The generated file can be easily examined with all provided tools from the [FTIO](https://github.com/tuda-parallel/FTIO) repo to: 
+1. find the period of the I/O phases [offline](https://github.com/tuda-parallel/FTIO#usage) or [online](https://github.com/tuda-parallel/FTIO/blob/main/docs/approach.md#online-prediction)
+2. visualize the traced results with [`ioplot`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot)
+3. Use [`ioparse`](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioparse) to merge several traces into a single profile that can be examined with [Extra-P](https://github.com/extra-p/extrap)
 
 ## Contributing
 
