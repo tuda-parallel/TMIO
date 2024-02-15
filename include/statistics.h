@@ -86,7 +86,7 @@ class statistics{
     ~statistics();
     
     //? Phase detection
-    void Remove_phase(int s = 0, int e = 0);
+    void Remove_Phase(int s = 0, int e = 0);
     void Overlap(std::vector<std::vector<int>>& , std::vector<double>& , std::string mode);
     double *Phase_Bandwidth(std::vector<std::vector<int>> &,std::string);
     void Phase_Detection(void);
@@ -98,7 +98,7 @@ class statistics{
     void Compute_App_Metrics(void);
     void Compute_Rank_Metrics(void);
     void Compute_Rank_Metrics_Core(bool,bool);
-    void clean(void);
+    void Clean(void);
 
     //? Time 
     double Lost_Time();

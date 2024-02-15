@@ -92,7 +92,7 @@ statistics::~statistics()
 	// keep it clean
 }
 
-void statistics::clean(void)
+void statistics::Clean(void)
 {
 
 // free(all_data);
@@ -135,12 +135,12 @@ void statistics::Compute(void)
 //* removes from the collected bandwidthes n last writes and m first writes (n=SKIP_LAST_WRITE m=SKIP_FIRST_WRITE)
 #if SKIP_LAST_WRITE > 0 || SKIP_FIRST_WRITE > 0
 	if (w_or_r)
-		Remove_phase(SKIP_FIRST_WRITE, SKIP_LAST_WRITE);
+		Remove_Phase(SKIP_FIRST_WRITE, SKIP_LAST_WRITE);
 #endif
 		//* removes from the collected bandwidthes n last read and m first read (n=SKIP_LAST_READ m=SKIP_FIRST_READ)
 #if SKIP_LAST_READ > 0 || SKIP_FIRST_READ > 0
 	if (!w_or_r)
-		Remove_phase(SKIP_FIRST_READ, SKIP_LAST_READ);
+		Remove_Phase(SKIP_FIRST_READ, SKIP_LAST_READ);
 #endif
 
 	//? (2) collective anaylsis of captured bandwidth
@@ -189,7 +189,7 @@ void statistics::Compute(void)
  *
  *
  */
-void statistics::Remove_phase(int s, int e)
+void statistics::Remove_Phase(int s, int e)
 {
 
 	iohf::Function_Debug(__PRETTY_FUNCTION__);
@@ -336,7 +336,7 @@ void statistics::Overlap(std::vector<std::vector<int>> &phase_overlap, std::vect
 
 // plot graph if flag is set
 #if OVERLAP_GRAPH > 0
-	iohf::Overlap_graph(phase_overlap, agg_phases);
+	iohf::Overlap_Graph(phase_overlap, agg_phases);
 #endif
 
 #if HDEBUG > 0
@@ -473,9 +473,9 @@ void statistics::Gather_Ind_Bandwidth(int rank, int procs, std::vector<double> t
 		all_t_act_e = (double *)malloc(sizeof(double) * agg_ops);
 	}
 
-	iohf::Gather_summary(t.size(), procs, rank, all_t, t, n_ind, IO_WORLD);
-	iohf::Gather_summary(t_act_s.size(), procs, rank, all_t_act_s, t_act_s, n_ind, IO_WORLD);
-	iohf::Gather_summary(t_act_e.size(), procs, rank, all_t_act_e, t_act_e, n_ind, IO_WORLD);
+	iohf::Gather_Summary(t.size(), procs, rank, all_t, t, n_ind, IO_WORLD);
+	iohf::Gather_Summary(t_act_s.size(), procs, rank, all_t_act_s, t_act_s, n_ind, IO_WORLD);
+	iohf::Gather_Summary(t_act_e.size(), procs, rank, all_t_act_e, t_act_e, n_ind, IO_WORLD);
 	if (flag_req)
 	{
 		if (rank == 0)
@@ -485,9 +485,9 @@ void statistics::Gather_Ind_Bandwidth(int rank, int procs, std::vector<double> t
 			all_t_req_e = (double *)malloc(sizeof(double) * agg_ops);
 		}
 
-		iohf::Gather_summary(b.size(), procs, rank, all_b, b, n_ind, IO_WORLD);
-		iohf::Gather_summary(t_req_s.size(), procs, rank, all_t_req_s, t_req_s, n_ind, IO_WORLD);
-		iohf::Gather_summary(t_req_e.size(), procs, rank, all_t_req_e, t_req_e, n_ind, IO_WORLD);
+		iohf::Gather_Summary(b.size(), procs, rank, all_b, b, n_ind, IO_WORLD);
+		iohf::Gather_Summary(t_req_s.size(), procs, rank, all_t_req_s, t_req_s, n_ind, IO_WORLD);
+		iohf::Gather_Summary(t_req_e.size(), procs, rank, all_t_req_e, t_req_e, n_ind, IO_WORLD);
 	}
 
 	free(n_ind);
@@ -782,18 +782,10 @@ void statistics::msgpack_pack(msgpack::packer<msgpack::sbuffer> &pk) const
 
 	// pack the next following together in an array
 	int n = 14;
-// #if ALL_SAMPLES > 4
-// 	if (flag_req)
-// 		n += 6;
-// 	else
-// 		n += 3;
-// #endif
 	pk.pack_array(n);
-	
 	pk.pack(s);
 	pk.pack(flag_req);
 	pk.pack(w_or_r);
-
 	pk.pack(agg_bytes);
 	pk.pack(max_bytes);
 	pk.pack(max_transfersize);

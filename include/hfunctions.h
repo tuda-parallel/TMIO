@@ -38,17 +38,17 @@ template<class T>
 T Max(T *, int);
 
 template <class T>
-void Phase_info(T ,T &,T &,MPI_Datatype);
+void Phase_Info(T ,T &,T &,MPI_Datatype);
 
 template <class T>
 void Phase_Max(T ,T &, MPI_Datatype);
 
 template <class T>
-void  Gather_summary(int, int ,int, T* , std::vector <T>, int*,MPI_Comm IO_WORLD = MPI_COMM_WORLD ,MPI_Datatype type = MPI_DOUBLE);
+void  Gather_Summary(int, int ,int, T* , std::vector <T>, int*,MPI_Comm IO_WORLD = MPI_COMM_WORLD ,MPI_Datatype type = MPI_DOUBLE);
 
 int  Get_Io_Ranks(int, int*);
-void Set_unit(double , std::string &,double &);
-void Compute_statistics(std::vector <double>,int );
+void Set_Unit(double , std::string &,double &);
+void Compute_Statistics(std::vector <double>,int );
 
 
 // function  for finding phases for the entire job
@@ -69,7 +69,7 @@ int* N_Phase(std::vector<std::vector<int>>&);
 double Sample_Time(double *, int );
 
 // debud functions
-void Overlap_graph(std::vector<std::vector<int>>&, int);
+void Overlap_Graph(std::vector<std::vector<int>>&, int);
 
 void Function_Debug(std::string);
 }
