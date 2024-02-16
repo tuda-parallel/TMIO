@@ -244,10 +244,10 @@ void IOtrace::Summary(void)
 		}
 
         Time_Info("Printing done >");
-        s_aw.clean();
-        s_ar.clean();
-        s_sw.clean();
-        s_sr.clean();
+        s_aw.Clean();
+        s_ar.Clean();
+        s_sw.Clean();
+        s_sr.Clean();
         free(all_n_aw);
         free(all_n_ar);
         free(all_n_sw);
