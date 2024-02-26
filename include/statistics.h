@@ -70,7 +70,7 @@ class statistics{
     
     //? bytes info 
     long long   max_bytes;        // max bytes transferred by a rank
-    long long   max_transfersize; // max bytes transferred during a phase
+    long long   max_bytes_phase; // max bytes transferred during a phase
     long long   agg_bytes;        // aggregated bytes over entire application       
 
     

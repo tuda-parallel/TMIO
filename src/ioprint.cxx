@@ -56,8 +56,8 @@ namespace ioprint
                 sprintf(out[counter++], "| %s|%s Max read bytes per rank    : %.2f %s\n", GREEN, BLACK, read_async.max_bytes*unit_scale, unit.c_str());
                 // iohf::Set_Unit(read_async.max_offset, unit, unit_scale);
                 // sprintf(out[counter++], "| %s|%s Max offset over ranks      : %.2f %s\n", GREEN, BLACK, read_async.max_offset*unit_scale, unit.c_str());
-                iohf::Set_Unit(read_async.max_transfersize, unit, unit_scale);
-                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, read_async.max_transfersize*unit_scale, unit.c_str());
+                iohf::Set_Unit(read_async.max_bytes_phase, unit, unit_scale);
+                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, read_async.max_bytes_phase*unit_scale, unit.c_str());
                 sprintf(out[counter++], "| %s|%s\n", GREEN, BLACK);
                 sprintf(out[counter++], "| %s| %s ___Throughput___%s\n", GREEN, CYAN, BLACK);
                 sprintf(out[counter++], "| %s| %s|%s Max # of I/O read phases per rank       : %i \n", GREEN, CYAN, BLACK, read_async.max_phases);
@@ -143,8 +143,8 @@ namespace ioprint
                 sprintf(out[counter++], "| %s|%s Max read bytes per rank    : %.2f %s\n", GREEN, BLACK, read_sync.max_bytes*unit_scale, unit.c_str());
                 // iohf::Set_Unit(read_sync.max_offset, unit, unit_scale);
                 // sprintf(out[counter++], "| %s|%s Max offset over ranks      : %.2f %s\n", GREEN, BLACK, read_sync.max_offset*unit_scale, unit.c_str());
-                iohf::Set_Unit(read_sync.max_transfersize, unit, unit_scale);
-                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, read_sync.max_transfersize*unit_scale, unit.c_str());
+                iohf::Set_Unit(read_sync.max_bytes_phase, unit, unit_scale);
+                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, read_sync.max_bytes_phase*unit_scale, unit.c_str());
                 sprintf(out[counter++], "| %s|%s\n", GREEN, BLACK);
                 sprintf(out[counter++], "| %s|%s Max # of I/O read phases per rank         : %i \n", GREEN, BLACK, read_sync.max_phases);
                 sprintf(out[counter++], "| %s|%s Aggregated # of I/O read phases           : %i \n", GREEN, BLACK, read_sync.agg_phases);
@@ -193,8 +193,8 @@ namespace ioprint
                 sprintf(out[counter++], "| %s|%s Max written bytes per rank : %.2f %s\n", GREEN, BLACK, write_async.max_bytes*unit_scale, unit.c_str());
                 // iohf::Set_Unit(write_async.max_offset, unit, unit_scale);
                 // sprintf(out[counter++], "| %s|%s Max offset over ranks      : %.2f %s\n", GREEN, BLACK, write_async.max_offset*unit_scale, unit.c_str());
-                iohf::Set_Unit(write_async.max_transfersize, unit, unit_scale);
-                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, write_async.max_transfersize*unit_scale, unit.c_str());
+                iohf::Set_Unit(write_async.max_bytes_phase, unit, unit_scale);
+                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, write_async.max_bytes_phase*unit_scale, unit.c_str());
                 sprintf(out[counter++], "| %s|%s\n", GREEN, BLACK);
                 sprintf(out[counter++], "| %s| %s ___Throughput___%s\n", GREEN, CYAN, BLACK);
                 sprintf(out[counter++], "| %s| %s|%s Max # of I/O write phases per rank      : %i \n", GREEN, CYAN, BLACK, write_async.max_phases);
@@ -280,8 +280,8 @@ namespace ioprint
                 sprintf(out[counter++], "| %s|%s Max written bytes per rank : %.2f %s\n", GREEN, BLACK, write_sync.max_bytes*unit_scale, unit.c_str());
                 // iohf::Set_Unit(write_sync.max_offset, unit, unit_scale);
                 // sprintf(out[counter++], "| %s|%s Max offset over ranks      : %.2f %s\n", GREEN, BLACK, write_sync.max_offset*unit_scale, unit.c_str());
-                iohf::Set_Unit(write_sync.max_transfersize, unit, unit_scale);
-                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, write_sync.max_transfersize*unit_scale, unit.c_str());
+                iohf::Set_Unit(write_sync.max_bytes_phase, unit, unit_scale);
+                sprintf(out[counter++], "| %s|%s Max transfersize           : %.2f %s\n", GREEN, BLACK, write_sync.max_bytes_phase*unit_scale, unit.c_str());
                 sprintf(out[counter++], "| %s|%s\n", GREEN, BLACK);
                 sprintf(out[counter++], "| %s|%s Max # of I/O write phases per rank        : %i \n", GREEN, BLACK, write_sync.max_phases);
                 sprintf(out[counter++], "| %s|%s Aggregated # of I/O write phases          : %i \n", GREEN, BLACK, write_sync.agg_phases);
@@ -419,7 +419,7 @@ namespace ioprint
                 sprintf(buff[counter++], "%s\"total_bytes\": %.2e,%s",line_start ,data.agg_bytes*unit_scale, line_end);
                 sprintf(buff[counter++], "%s\"max_bytes_per_rank\": %.2e,%s",line_start ,data.max_bytes*unit_scale, line_end);
                 // sprintf(buff[counter++], "%s\"max_offset_over_ranks\": %.2e,%s",line_start ,data.max_offset*unit_scale, line_end);
-                sprintf(buff[counter++], "%s\"max_transfersize_over_ranks\": %.2e,%s",line_start ,data.max_transfersize*unit_scale, line_end);
+                sprintf(buff[counter++], "%s\"max_bytes_per_phase\": %.2e,%s",line_start ,data.max_bytes_phase*unit_scale, line_end);
                 sprintf(buff[counter++], "%s\"max_io_phases_per_rank\": %i,%s",line_start ,data.max_phases, line_end);
                 sprintf(buff[counter++], "%s\"total_io_phases\": %i,%s",line_start ,data.agg_phases, line_end);
                 sprintf(buff[counter++], "%s\"max_io_ops_in_phase\": %lli,%s",line_start ,data.max_ops, line_end);

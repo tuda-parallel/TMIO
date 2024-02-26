@@ -10,7 +10,7 @@ statistics::statistics(void)
 	agg_phases = 0;
 	max_bytes = 0;
 	agg_bytes = 0;
-	max_transfersize = 0;
+	max_bytes_phase = 0;
 }
 
 statistics::statistics(collect *c, int *n, int rank, int procs, bool w_or_r, bool flag_req)
@@ -41,7 +41,7 @@ statistics::statistics(collect *c, int *n, int rank, int procs, bool w_or_r, boo
 
 		max_bytes = 0; // maximum bytes transfered by a ranks
 		long long tmp_max_bytes = 0;
-		max_transfersize = 0; // maximum bytes transfered during phase
+		max_bytes_phase = 0; // maximum bytes transfered during phase
 		agg_bytes = 0;		  // aggregated bytes for entire application
 
 		int counter = 0;
@@ -75,8 +75,8 @@ statistics::statistics(collect *c, int *n, int rank, int procs, bool w_or_r, boo
 					max_ops = all_data[counter].n_op;
 
 				// maximum bytes over all phases
-				if (all_data[counter].data > max_transfersize)
-					max_transfersize = all_data[counter].data;
+				if (all_data[counter].data > max_bytes_phase)
+					max_bytes_phase = all_data[counter].data;
 
 				agg_ops += all_data[counter].n_op;
 				agg_bytes += all_data[counter].data;
@@ -788,7 +788,7 @@ void statistics::msgpack_pack(msgpack::packer<msgpack::sbuffer> &pk) const
 	pk.pack(w_or_r);
 	pk.pack(agg_bytes);
 	pk.pack(max_bytes);
-	pk.pack(max_transfersize);
+	pk.pack(max_bytes_phase);
 	pk.pack(max_phases);
 	pk.pack(agg_phases);
 	pk.pack(max_ops);
