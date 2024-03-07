@@ -40,10 +40,37 @@ msgpack_build (){
 }
 #######################################
 
+############# zmq ######################
+# create git
+zmq () {
+	if [ ! -d "${DIR}/${FUNCNAME[0]}" ]; then
+		mkdir -p ${DIR}/${FUNCNAME[0]}
+		# git clone "https://github.com/zeromq/libzmq.git" "${DIR}/${FUNCNAME[0]}/libzmq"
+		git clone "https://github.com/zeromq/cppzmq.git" "${DIR}/${FUNCNAME[0]}/cppzmq"
+		
+	else
+		echo "git already exists:"${DIR}/${FUNCNAME[0]}/cppzmq""
+	fi
+}
+
+
+zmq_build (){
+	cd ${DIR}/zmq/libzmq
+	mkdir build && cd build && cmake .. ; make 
+	cd ${DIR}/zmq/cppzmq
+	cmake . ; make 
+	echo "Successfully created ${FUNCNAME[0]}"
+}
+#######################################
+
 if [[ ${TARGETS} == *"msgpack"* ]]; then
 	echo "building: ${TARGETS}"
 	msgpack
 	msgpack_build
+elif [[ ${TARGETS} == *"zmq"* ]]; then
+	echo "building: ${TARGETS}"
+	zmq
+	zmq_build
 else
 	echo -e "${RED}No target specified${BLACK}"
 fi

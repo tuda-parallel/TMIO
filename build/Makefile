@@ -163,6 +163,11 @@ openmp_library: clean pre libtmio.so
 
 
 #**************************************
+#*  ZMQ support                    *
+#**************************************
+zmq: zmq_git_build run 
+
+#**************************************
 #*  MSGPACK support                    *
 #**************************************
 msgpack: msgpack_build run
@@ -439,3 +444,6 @@ msgpack_git_build:
 	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
 	$(TMIO_REPO)/dep/create_lib.sh "msgpack"
 
+zmq_git_build:
+	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
+	$(TMIO_REPO)/dep/create_lib.sh "zmq"
