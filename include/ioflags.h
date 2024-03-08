@@ -124,8 +124,8 @@
 //*******************************
 #ifndef DFT //TODO: do some kind of check for the flags
 #define DFT 0 // if set, a DFT is performed on the phases (DO_CALC must be set to 1)
-// 1: performs DFT and dilvers sampled bandwidth (b_sampled), Amplitude (A), angle (phi), and settings (start/end time, N samples, T_s sample rate)
-// 2: 1 + original siginal ( b and t)
+// 1: performs DFT and delivers sampled bandwidth (b_sampled), Amplitude (A), angle (phi), and settings (start/end time, N samples, T_s sample rate)
+// 2: 1 + original signal ( b and t)
 #endif
 
 #ifndef DFT_TIME_WINDOW
@@ -175,7 +175,7 @@
 #ifndef BW_LIMIT_STRATEGY
 #define BW_LIMIT_STRATEGY 2 // 0: always (default) -- 1: increase only -- 2: limit the down side 
 #endif
-// Tolerance value to scale the disred values
+// Tolerance value to scale the desired values
 #ifndef TOL
 #define TOL 1.1
 #endif
@@ -185,14 +185,14 @@
 
 //* Output File     
 //*******************************
-#ifndef BINARY_FILE_FORMAT
-#define BINARY_FILE_FORMAT 0
-// 1 FILE_FORMAT "binary" --> set define MSGPACK to obtain binary msgpack format
+#ifndef FILE_FORMAT
+#define FILE_FORMAT 0
 // 0 FILE_FORMAT "jsonl"
+// 1 FILE_FORMAT "binary" 
+// 2 FILE_FORMAT "msgpack" 
+// 3 FILE_FORMAT "zmq" 
 #endif
 
-// Use msgpack to obtain binary msgpack. Call "make msgpack" before creating the library
-// #define MSGPACK
 
 
 

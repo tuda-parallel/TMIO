@@ -16,7 +16,7 @@ public:
 	std::string Print_Json(bool jsonl = false);
 	const char *Color_Percent(double);
 
-#ifdef MSGPACK
+#if FILE_FORMAT > 1
 MSGPACK_DEFINE(
 	name,
 	delta_t_agg,

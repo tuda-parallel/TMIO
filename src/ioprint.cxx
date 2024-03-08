@@ -655,43 +655,7 @@ namespace ioprint
 
 
 				static int chunk = 0;
-				#ifdef MSGPACK	
-				//? One file:
-				std::string name = std::to_string(processes) + ".msgpack";
-				static bool first_time = true;
-				auto flag  = std::ios_base::binary | std::ios_base::app ;
-				if (first_time){
-                    flag = std::ios_base::binary;
-                    first_time = false;}
-				//Several ffiles
-				// std::string name = std::to_string(processes) + ".msgpack" + "_chunk_" + std::to_string(chunk) ;
-				// auto flag = std::ios_base::binary;
-				#else
-				std::string name = std::to_string(processes) + ".bin" + "_chunk_" + std::to_string(chunk) ;
-				auto flag = std::ios_base::binary;
-				#endif				
-				std::ofstream file(name, flag);
-
-				#ifdef MSGPACK	
-				msgpack::sbuffer buffer;
-		
-				// Pack 
-				// msgpack::pack(buffer,std::string("read_async"));
-				msgpack::pack(buffer, read_async);
-				// msgpack::pack(buffer,std::string("read_sync"));
-				msgpack::pack(buffer, read_sync);
-				// msgpack::pack(buffer,std::string("write_async"));
-				msgpack::pack(buffer, write_async);
-				// msgpack::pack(buffer,std::string("write_sync"));
-				msgpack::pack(buffer, write_sync);
-				// msgpack::pack(buffer,std::string("time"));
-				msgpack::pack(buffer, io_time);
-
- 				// Write the serialized data to the file
-				file.write(buffer.data(), buffer.size());
-				file.close();
-
-				#else
+				#if FILE_FORMAT == 1
 				// Generate a large string
 				std::string print = Format_Json(read_sync, "read_sync",false,true);
                 print.append(Format_Json(read_async, "read_async_t",false,true));
@@ -701,11 +665,62 @@ namespace ioprint
                 print.append(Format_Json(write_sync, "write_sync",false, true));
                 print.append(io_time.Print_Json(true));
 				
+				std::string name = std::to_string(processes) + ".bin" + "_chunk_" + std::to_string(chunk) ;
+				auto flag = std::ios_base::binary;
+				std::ofstream file(name, flag);
 				if (file.is_open()){
 					file.write(print.c_str(), print.size());
 					file.close();
 				}
-		#endif
+
+				#else  // MSGPack & ZMQ
+				msgpack::sbuffer buffer;
+				// Pack 
+				msgpack::pack(buffer, read_async);
+				msgpack::pack(buffer, read_sync);
+				msgpack::pack(buffer, write_async);
+				msgpack::pack(buffer, write_sync);
+				msgpack::pack(buffer, io_time);
+				#if FILE_FORMAT == 2 // MSGPACK
+				
+				//? 1) One file:
+				std::string name = std::to_string(processes) + ".msgpack";
+				static bool first_time = true;
+				auto flag  = std::ios_base::binary | std::ios_base::app ;
+				if (first_time){
+                    flag = std::ios_base::binary;
+                    first_time = false;}
+				//? 2) Several files
+				// std::string name = std::to_string(processes) + ".msgpack" + "_chunk_" + std::to_string(chunk) ;
+				// auto flag = std::ios_base::binary;
+				std::ofstream file(name, flag);
+
+				// Write the serialized data to the file
+				file.write(buffer.data(), buffer.size());
+				file.close();
+				#elif FILE_FORMAT == 3  // ZMQ
+				zmq::context_t context(1);
+				zmq::socket_t socket(context, ZMQ_PUSH);
+
+				static bool first_time = true;
+				static std::string port = "tcp://127.0.0.1:5555";
+				if (first_time){
+                    std::ifstream myfile ("ftio_port");
+					if (myfile.good() && myfile.is_open())
+					{
+						while ( getline (myfile,port) )
+						{
+							std::cout << port << '\n';
+						}
+						myfile.close();
+					}
+                    first_time = false;}
+				socket.bind(port);
+				zmq::message_t message(buffer.size());
+				memcpy(message.data(), buffer.data(), buffer.size());
+				socket.send(message, zmq::send_flags::none);
+				#endif
+				#endif
 		chunk++;
         }
 }

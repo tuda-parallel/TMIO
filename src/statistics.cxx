@@ -766,7 +766,7 @@ double statistics::Total_Time(std::string mode)
  *
  * @return double
  */
-#ifdef MSGPACK
+#if FILE_FORMAT > 1
 // Serialize the class manually
 void statistics::msgpack_pack(msgpack::packer<msgpack::sbuffer> &pk) const
 {

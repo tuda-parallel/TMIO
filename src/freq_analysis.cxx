@@ -19,7 +19,7 @@ namespace freq_analysis
 #if DFT >= 1
 	std::complex<double> *Dft(double *b, double *t, int n, bool flag_req, bool w_or_r, int procs, double& dft_time, double freq)
 	{
-		// few refrences:
+		// few references:
 		//(1) https://pythonnumericalmethods.berkeley.edu/notebooks/chapter24.02-Discrete-Fourier-Transform.html
 		//(2) https://www.robots.ox.ac.uk/~sjrob/Teaching/SP/l7.pdf
 

@@ -11,8 +11,12 @@
 #include <omp.h>
 #endif
 
-#ifdef MSGPACK
+#if FILE_FORMAT > 1
 #include "msgpack.hpp"
+#endif
+
+#if FILE_FORMAT > 2
+#include <zmq.hpp>
 #endif
 
 namespace iohf{
@@ -25,7 +29,6 @@ double Weighted_Harmonic_Mean(long long *, double* , int);
 double Min(double [],int,int* ptr=NULL);
 double Variance(double [], int n, double mean = NAN);
 double Standard_Deviation(double [], int n, double mean = NAN);
-
 double Agg_Over_Ranks(double *, int *, int, int mode = 1);
 
 template <class T>
@@ -47,6 +50,7 @@ template <class T>
 void  Gather_Summary(int, int ,int, T* , std::vector <T>, int*,MPI_Comm IO_WORLD = MPI_COMM_WORLD ,MPI_Datatype type = MPI_DOUBLE);
 
 int  Get_Io_Ranks(int, int*);
+std::string Get_File_Format(int);
 void Set_Unit(double , std::string &,double &);
 void Compute_Statistics(std::vector <double>,int );
 

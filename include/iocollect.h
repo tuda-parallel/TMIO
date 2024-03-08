@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string.h>
-#ifdef MSGPACK
+#if FILE_FORMAT > 1
 #include "msgpack.hpp"
 #endif
 /**
@@ -13,7 +13,7 @@
 
 
 /**
- * @brief strucutred used to call all phase inforamtion of a rank
+ * @brief structured used to call all phase information of a rank
  * 
  * @param data sum of data during the phase
  * @param t_start start of the I/O phase
@@ -42,7 +42,7 @@ class collect{
     double get(std::string) const;
     void set(std::string mode, double value);
 
-	#ifdef MSGPACK
+	#if FILE_FORMAT > 1
 		MSGPACK_DEFINE(data, t_start, t_end_act, t_end_req, T_sum, T_avr, B_sum, B_avr, n_op);
 	#endif
 };

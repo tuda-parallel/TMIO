@@ -73,8 +73,8 @@ void IOtrace::Init(void)
 		"Test    : %i\n"
 		"Calc    : %i\n"
 		"Samples : %i\n"
-		"Binary  : %i\n"
-		"%s===========================\n\n", TEST, DO_CALC, ALL_SAMPLES, BINARY_FILE_FORMAT, info.c_str());
+		"%s\n"
+		"%s===========================\n\n", TEST, DO_CALC, ALL_SAMPLES, iohf::Get_File_Format(FILE_FORMAT).c_str(), info.c_str());
 	}
 #if IOTRACE_VERBOSE >= 1
     printf("%s > rank %i / %i %s> I/O tracer initiated %s\n", caller, rank, processes - 1, BLUE, BLACK);
@@ -83,7 +83,7 @@ void IOtrace::Init(void)
 
 /**
  * @brief displays a summary of the results to the out stream.
- *  @param finalize: if true, summary is called through MPI_finalize -> remove all unneded data
+ *  @param finalize: if true, summary is called through MPI_finalize -> remove all unended data
  */
 void IOtrace::Summary(void)
 {
@@ -205,7 +205,7 @@ void IOtrace::Summary(void)
     
     // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,MPI_Wtime() - t_0);
 
-    //? Overhead caclualtion
+    //? Overhead calculation
     //?-------------------------
     double *time = Overhead_Calculation();
 
@@ -225,7 +225,7 @@ void IOtrace::Summary(void)
         if (finalize){
             ioprint::Summary(processes, s_sr, s_ar, s_sw, s_aw, io_time);
             if(online_file_generation == false)
-                #if BINARY_FILE_FORMAT == 1
+                #if FILE_FORMAT >= 1
 					ioprint::Binary(processes, s_sr, s_ar, s_sw, s_aw, io_time); 
 				#else
 					ioprint::Json(processes, s_sr, s_ar, s_sw, s_aw, io_time); 
@@ -235,7 +235,7 @@ void IOtrace::Summary(void)
             online_file_generation = true;
 
         if(online_file_generation == true){
-			#if BINARY_FILE_FORMAT == 1
+			#if FILE_FORMAT >= 1
 				ioprint::Binary(processes, s_sr, s_ar, s_sw, s_aw, io_time); 
 			#else
 				ioprint::Jsonl(processes, s_sr, s_ar, s_sw, s_aw, io_time); 

@@ -327,6 +327,31 @@ namespace iohf
 		return counter;
 	}
 
+	std::string Get_File_Format(int number)
+	{
+		if (number == 0)
+		{
+			return "File    : JSON/JSONL";
+		}
+		else if (number == 1)
+		{
+			return "File    : Binary";
+		}
+		else if (number == 2)
+		{
+			return "File    : MsgPack";
+		}
+		else if (number == 3)
+		{
+			return "Data    : ZMQ";
+		}
+			
+		else
+		{
+			return "Data    : undefined!";
+		}
+	}
+
 	// sorts array and returns index
 	int *Sort_With_Index(double *v, int N)
 	{

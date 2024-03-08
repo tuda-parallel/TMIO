@@ -75,7 +75,7 @@ class statistics{
 
     
 
-    #ifdef MSGPACK	
+    #if FILE_FORMAT > 1
     void msgpack_pack(msgpack::packer<msgpack::sbuffer>& pk) const;
     #endif
 

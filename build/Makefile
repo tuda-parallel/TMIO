@@ -66,6 +66,7 @@ PREFIX     :=
 CXX_FLAGS  :=
 CXX        := g++
 CXX_INC    := 
+CXX_LIB_FLAGS:= 
 #CXX_DEBUG  := -DDEBUG -DIOTRACE_VERBOSE=1 -DIODATA_VERBOSE=1
 # see ./include/ioflags.h
 # CXX_DEBUG  := -DCOLOR_OUTPUT 
@@ -109,7 +110,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cxx $(INC_DIR)/%.h
 # $(EXECUTABLE): CXX_DEBUG += -DTMIO=1
 # link objects
 $(EXECUTABLE): $(OBJ_FILES)
-	$(MPICXX) $(CXX_FLAGS) -o $@ $^
+	$(MPICXX) $(CXX_FLAGS) -o $@ $^ $(CXX_LIB_FLAGS)
 
 
 pre: 
@@ -165,19 +166,28 @@ openmp_library: clean pre libtmio.so
 #**************************************
 #*  ZMQ support                    *
 #**************************************
-zmq: zmq_git_build run 
+zmq: zmq_build run 
 
+zmq_build: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
+zmq_build: CXX_LIB_FLAGS += -lzmq
+zmq_build: CXX_DEBUG += -DFILE_FORMAT=3
+zmq_build: zmq_git_build msgpack_git_build clean_build build
+
+zmq_library: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
+zmq_library: CXX_LIB_FLAGS += -lzmq
+zmq_library: override CXX_DEBUG := -DFILE_FORMAT=3
+zmq_library: clean pre zmq_git_build msgpack_git_build libtmio.so
 #**************************************
 #*  MSGPACK support                    *
 #**************************************
 msgpack: msgpack_build run
 
 msgpack_build: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include
-msgpack_build: CXX_DEBUG += -DMSGPACK -DBINARY_FILE_FORMAT=1
+msgpack_build: CXX_DEBUG += -DFILE_FORMAT=2
 msgpack_build: msgpack_git_build clean_build build
 
 msgpack_library: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include
-msgpack_library: override CXX_DEBUG := -DMSGPACK -DBINARY_FILE_FORMAT=1
+msgpack_library: override CXX_DEBUG := -DFILE_FORMAT=2
 msgpack_library: clean pre msgpack_git_build libtmio.so
 
 #**************************************
