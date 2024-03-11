@@ -53,7 +53,7 @@ class statistics{
 
 
 
-    //* Metrics common between throughput and bandiwdth
+    //* Metrics common between throughput and bandwidth
     // number of ranks
     int     procs_io; // only procs that did io
     int     procs;    // all procs

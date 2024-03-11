@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     double t_io = 0;
     std::string filename = "file";
     //! each process does these things
-    MPI_Init(&argc, &argv); //? after this, each process sees everythnig here private
+    MPI_Init(&argc, &argv); //? after this, each process sees everything here private
     int hours, minutes;
     double seconds = MPI_Wtime();
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); //? each process gets its id
