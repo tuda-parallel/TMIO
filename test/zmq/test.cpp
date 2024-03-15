@@ -4,9 +4,9 @@
 
 int main() {
     zmq::context_t context(1);
-    zmq::socket_t socket(context, ZMQ_PUSH);
-
-    socket.bind("tcp://127.0.0.1:5555");
+	zmq::socket_t sender(context, ZMQ_PUSH);
+    sender.connect("tcp://127.0.0.1:5555");
+	// socket.bind("tcp://127.0.0.1:5555");
 
     // Create a MessagePack object to hold the data
     msgpack::sbuffer buffer;
@@ -46,7 +46,7 @@ int main() {
     zmq::message_t message(buffer.size());
     memcpy(message.data(), buffer.data(), buffer.size());
 
-    socket.send(message, zmq::send_flags::none);
+    sender.send(message, zmq::send_flags::none);
 
     return 0;
 }
