@@ -655,7 +655,17 @@ namespace ioprint
 	{
 
 		static int chunk = 0;
-#if FILE_FORMAT == 1
+#if FILE_FORMAT == 2 || FILE_FORMAT == 3 // MSGPack & ZMQ
+		msgpack::sbuffer buffer;
+		// Pack
+		msgpack::pack(buffer, read_async);
+		msgpack::pack(buffer, read_sync);
+		msgpack::pack(buffer, write_async);
+		msgpack::pack(buffer, write_sync);
+		msgpack::pack(buffer, io_time);
+#endif
+
+#if FILE_FORMAT == 1 // Plain binary
 		// Generate a large string
 		std::string print = Format_Json(read_sync, "read_sync", false, true);
 		print.append(Format_Json(read_async, "read_async_t", false, true));
@@ -674,16 +684,7 @@ namespace ioprint
 			file.close();
 		}
 
-#elif FILE_FORMAT == 2 || FILE_FORMAT == 3 // MSGPack & ZMQ
-		msgpack::sbuffer buffer;
-		// Pack
-		msgpack::pack(buffer, read_async);
-		msgpack::pack(buffer, read_sync);
-		msgpack::pack(buffer, write_async);
-		msgpack::pack(buffer, write_sync);
-		msgpack::pack(buffer, io_time);
-
-#if FILE_FORMAT == 2   // MSGPACK
+#elif FILE_FORMAT == 2 // MSGPACK
 
 		//? 1) One file:
 		std::string name = std::to_string(processes) + ".msgpack";
@@ -702,6 +703,7 @@ namespace ioprint
 		// Write the serialized data to the file
 		file.write(buffer.data(), buffer.size());
 		file.close();
+
 #elif FILE_FORMAT == 3 // ZMQ
 		zmq::context_t context(1);
 		zmq::socket_t socket(context, ZMQ_PUSH);
@@ -726,7 +728,7 @@ namespace ioprint
 		memcpy(message.data(), buffer.data(), buffer.size());
 		socket.send(message, zmq::send_flags::none);
 #endif
-#endif
+
 		chunk++;
 	}
 }
