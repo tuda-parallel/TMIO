@@ -28,7 +28,7 @@ This repository contains the TMIO source code. TMIO is a C++ tracing library tha
 attached to existing code to monitor MPI-IO online. The tool traces synchronous as well as asynchronous I/O.
 TMIO offers a C as well as a C++ interface.
 We provide two methods for linking the library to the application, depending on whether the information is used for [offline](#offline-analysis) or [online](#online-analysis) analysis.
-The obtained traces can be analyzed as explained here [Exploring the Traces](#exploring-the-traces).
+The obtained traces can be analyzed as explained here [exploring the traces](#exploring-the-traces).
 
 
 
@@ -119,7 +119,7 @@ LD_PRELOAD=path_to_lib/libtmio.so $(MPIRUN)  -np $(PROCS) $(MPI_RUN_FLAGS) ./you
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Online Analysis:
-The code needs to be compiled with the library ([IOR example](/examples/IOR/README.md#instructions)). Basically, three steps need to be performed:
+The code needs to be compiled with the library ([IOR example](/examples/IOR/README.md#instructions)). Three steps need to be performed:
   1. The library needs to be included in the code: 
 		```C++
 		// Somewhere at the beginning of the code
