@@ -3,7 +3,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10670270.svg)](https://doi.org/10.5281/zenodo.12700677)
 
 
-Below, we describe how to reproduce the experiments in the Paper entitled:
+Below, we des^cribe how to reproduce the experiments in the Paper entitled:
 "I/O Behind the Scenes: Bandwidth Requirements of HPC Applications With Asynchronous I/O," which was published at the CLUSTER 2024
 
 Before you start, first set up the correct [TMIO version](#ftio-version).
@@ -14,6 +14,7 @@ The experiments are divided into four parts:
 		- [TMIO Version](#tmio-version)
 		- [Extracting the Data Set:](#extracting-the-data-set)
 	- [Artifacts](#artifacts)
+		- [Modified HACC-IO](#modified-hacc-io)
 	- [Citation](#citation)
 
 ## Prerequisites 
@@ -41,19 +42,35 @@ This extracts the needed traces and experiments:
 
 ```sh
 data
-├── application_traces
+└─── application_traces
     ├── WACOM++
-    ├── HACC-IO
+    └── HACC-IO
 
 ```
 
 ## Artifacts
 
+### Modified HACC-IO
+Either extract the data set as described [here](#extracting-the-data-set) or download the modified HACC-IO code from [GitHub](https://github.com/A-Tarraf/hacc-io)
+
+
+
 
 ## Citation
-The paper citation is available [here](/README.md#citation). You can cite the [data set](https://doi.org/10.5281/zenodo.12700677) as:
+The paper citation is also available [here](/README.md#citation). You can cite the [data set](https://doi.org/10.5281/zenodo.12700677) as:
 ```
  
+ @inproceedings{AT24a, 
+   author={Tarraf, Ahmad and Muñoz, Javier Fernandez and Singh, David E. and Özden, Taylan and Carretero, Jesus and Wolf, Felix},
+   title={I/O Behind the Scenes: Bandwidth Requirements of HPC Applications With Asynchronous I/O}, 
+   address={Kobe, Japan}, 
+   booktitle={2024 IEEE International Conference on Cluster Computing (CLUSTER)}, 
+   year={2024}, 
+   month={sep},
+   note={(accepted)}
+ }
+
+
 @dataset{tarraf_2024_12700678,
   author       = {Tarraf, Ahmad and
                   Muñoz, Javier Fernández and

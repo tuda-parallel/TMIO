@@ -185,6 +185,16 @@ Authors:
 ## Citation
 
 ```
+  @inproceedings{AT24a, 
+   author={Tarraf, Ahmad and Muñoz, Javier Fernandez and Singh, David E. and Özden, Taylan and Carretero, Jesus and Wolf, Felix},
+   title={I/O Behind the Scenes: Bandwidth Requirements of HPC Applications With Asynchronous I/O}, 
+   address={Kobe, Japan}, 
+   booktitle={2024 IEEE International Conference on Cluster Computing (CLUSTER)}, 
+   year={2024}, 
+   month={sep},
+   note={(accepted)}
+  }
+
  @inproceedings{Tarraf_Bandet_Boito_Pallez_Wolf_2024, 
   author={Tarraf, Ahmad and Bandet, Alexis and Boito, Francieli and Pallez, Guillaume and Wolf, Felix},
   title={Capturing Periodic I/O Using Frequency Techniques}, 
@@ -192,8 +202,7 @@ Authors:
   address={San Francisco, CA, USA}, 
   year={2024},
   month=may, 
-  pages={1–14}, 
-  notes = {(accepted)}
+  pages={1–14}
  }
 ```
 
