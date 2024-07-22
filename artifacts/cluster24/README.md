@@ -3,15 +3,16 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10670270.svg)](https://doi.org/10.5281/zenodo.12700677)
 
 
-Below, we des^cribe how to reproduce the experiments in the Paper entitled:
+Below, we describe how to reproduce the experiments in the Paper entitled:
 "I/O Behind the Scenes: Bandwidth Requirements of HPC Applications With Asynchronous I/O," which was published at the CLUSTER 2024
 
-Before you start, first set up the correct [TMIO version](#ftio-version).
+Before you start, first set up the correct [TMIO version](#tmio-version).
 The experiments are divided into four parts:
 
 - [Artifacts Reproducibility](#artifacts-reproducibility)
 	- [Prerequisites](#prerequisites)
 		- [TMIO Version](#tmio-version)
+		- [Modified MPICH:](#modified-mpich)
 		- [Extracting the Data Set:](#extracting-the-data-set)
 	- [Artifacts](#artifacts)
 		- [Modified HACC-IO](#modified-hacc-io)
@@ -28,6 +29,9 @@ For all the cases below, `tmio` first needs to be installed (see [Installation](
 ```sh
 git checkout v0.0.1 
 ```
+### Modified MPICH:
+
+Download and install the modified MPICH from [[https://github.com/jfmunoz00/MPICH-IOBandwidth-Limitation]].
 
 ### Extracting the Data Set:
 download the zip file from [here](https://doi.org/10.5281/zenodo.12700677) or using wget in a bash terminal:
@@ -51,7 +55,7 @@ data
 ## Artifacts
 
 ### Modified HACC-IO
-Either extract the data set as described [here](#extracting-the-data-set) or download the modified HACC-IO code from [GitHub](https://github.com/A-Tarraf/hacc-io)
+Either extract the data set as described [here](#extracting-the-data-set) or download the modified HACC-IO code from [GitHub](https://github.com/A-Tarraf/hacc-io).
 
 
 
