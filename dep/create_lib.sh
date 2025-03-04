@@ -45,7 +45,7 @@ msgpack_build (){
 zmq () {
 	if [ ! -d "${DIR}/${FUNCNAME[0]}" ]; then
 		mkdir -p ${DIR}/${FUNCNAME[0]}
-		# git clone "https://github.com/zeromq/libzmq.git" "${DIR}/${FUNCNAME[0]}/libzmq"
+		git clone "https://github.com/zeromq/libzmq.git" "${DIR}/${FUNCNAME[0]}/libzmq"
 		git clone "https://github.com/zeromq/cppzmq.git" "${DIR}/${FUNCNAME[0]}/cppzmq"
 		
 	else

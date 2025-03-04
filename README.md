@@ -146,6 +146,9 @@ The generated file can be easily examined with all provided tools from the [FTIO
 
 ## Contributing
 
+> [!note] 
+> If you are a student from TU Darmstadt, kindly see these [instructions](/docs/students_contribute.md).
+
 If you have a suggestion that would make this better, please fork the repo and create a pull request.
 
 1. Fork the Project

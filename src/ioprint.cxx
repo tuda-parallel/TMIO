@@ -706,27 +706,36 @@ namespace ioprint
 
 #elif FILE_FORMAT == 3 // ZMQ
 		zmq::context_t context(1);
-		zmq::socket_t socket(context, ZMQ_PUSH);
-
-		static bool first_time = true;
 		static std::string port = "tcp://127.0.0.1:5555";
-		if (first_time)
-		{
-			std::ifstream myfile("ftio_port");
-			if (myfile.good() && myfile.is_open())
-			{
-				while (getline(myfile, port))
-				{
-					std::cout << port << '\n';
-				}
-				myfile.close();
-			}
-			first_time = false;
-		}
-		socket.bind(port);
+		// zmq::socket_t socket(context, ZMQ_PUSH);
+		// static bool first_time = true;
+		// if (first_time)
+		// {
+		// 	std::ifstream myfile("ftio_port");
+		// 	if (myfile.good() && myfile.is_open())
+		// 	{
+		// 		while (getline(myfile, port))
+		// 		{
+		// 			std::cout << port << '\n';
+		// 		}
+		// 		myfile.close();
+		// 	}
+		// 	first_time = false;
+		// }
+		// socket.bind(port);
+		// zmq::message_t message(buffer.size());
+		// memcpy(message.data(), buffer.data(), buffer.size());
+		// socket.send(message, zmq::send_flags::none);
+
+		// prepare message
 		zmq::message_t message(buffer.size());
 		memcpy(message.data(), buffer.data(), buffer.size());
-		socket.send(message, zmq::send_flags::none);
+		
+		// send message
+		zmq::socket_t sender(context, ZMQ_PUSH);
+		sender.connect(port);
+		sender.send(message, zmq::send_flags::none);
+		printf("Sending over port %s",port.c_str());
 #endif
 
 		chunk++;

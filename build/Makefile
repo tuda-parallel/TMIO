@@ -126,7 +126,7 @@ library: clean pre libtmio.so
 
 libtmio.so: CXX_FLAGS += -fPIC -Wall -shared
 libtmio.so:  $(OBJ_FILES_FOR_LIBRARY) 
-	$(MPICXX) $(CXX_FLAGS) -o $@ $^
+	$(MPICXX) $(CXX_FLAGS) -o $@ $^ $(CXX_LIB_FLAGS)
 
 
 #**************************************
@@ -166,17 +166,20 @@ openmp_library: clean pre libtmio.so
 #**************************************
 #*  ZMQ support                    *
 #**************************************
-zmq: zmq_build run 
+zmq: zmq_pre zmq_build run 
+
+zmq_pre: zmq_git_build msgpack_git_build
 
 zmq_build: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
 zmq_build: CXX_LIB_FLAGS += -lzmq
 zmq_build: CXX_DEBUG += -DFILE_FORMAT=3
-zmq_build: zmq_git_build msgpack_git_build clean_build build
+zmq_build: clean_build build
 
 zmq_library: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
-zmq_library: CXX_LIB_FLAGS += -lzmq
+# zmq_library: CXX_LIB_FLAGS += -lzmq
 zmq_library: override CXX_DEBUG := -DFILE_FORMAT=3
-zmq_library: clean pre zmq_git_build msgpack_git_build libtmio.so
+zmq_library: clean pre zmq_git_build libtmio.so
+
 #**************************************
 #*  MSGPACK support                    *
 #**************************************
@@ -456,4 +459,4 @@ msgpack_git_build:
 
 zmq_git_build:
 	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
-	$(TMIO_REPO)/dep/create_lib.sh "zmq"
+	$(TMIO_REPO)/dep/create_lib.sh "zmq" || echo "Failed to build ZMQ"
