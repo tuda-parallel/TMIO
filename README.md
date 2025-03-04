@@ -190,12 +190,13 @@ Authors:
 ```
   @inproceedings{AT24a, 
    author={Tarraf, Ahmad and Muñoz, Javier Fernandez and Singh, David E. and Özden, Taylan and Carretero, Jesus and Wolf, Felix},
-   title={I/O Behind the Scenes: Bandwidth Requirements of HPC Applications With Asynchronous I/O}, 
-   address={Kobe, Japan}, 
+   title={I/O Behind the Scenes: Bandwidth Requirements of HPC Applications with Asynchronous I/O}, 
    booktitle={2024 IEEE International Conference on Cluster Computing (CLUSTER)}, 
+   address={Kobe, Japan}, 
    year={2024}, 
    month={sep},
-   note={(accepted)}
+   pages={426-439},
+   doi={10.1109/CLUSTER59578.2024.00044}
   }
 
  @inproceedings{Tarraf_Bandet_Boito_Pallez_Wolf_2024, 
