@@ -123,7 +123,7 @@ The code needs to be compiled with the library ([IOR example](/examples/IOR/READ
   1. The library needs to be included in the code: 
 		```C++
 		// Somewhere at the beginning of the code
-			#include "tmio_c.h"
+		#include "tmio_c.h"
 		```
   2. A single line needs to be added indicating when to flush the data out. Whenever this line is reached, the collected traces are flushed out to the tracing file:
 		```C++
