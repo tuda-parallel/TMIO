@@ -27,7 +27,7 @@
 
 3. **Creating Issues**:
    - Once your thesis starts, create an issue to describe the feature, bug fix, or enhancement you plan to implement. This helps us track contributions and avoids duplicate work. Keep the description abstract and add a few checkboxes listing what you want to add. You do not need to explicitly mention the methods. Keep it abstract, mentioning the purpose or benefits gained.
-   - Go to the **Issues** tab in the [FTIO repository](https://github.com/tuda-parallel/FTIO).
+   - Go to the **Issues** tab in the [TMIO repository](https://github.com/tuda-parallel/TMIO).
    - Click **New Issue** and provide a clear title and description.
    - Label the issue appropriately as `feature` and include call it `feature...`.
    - Once you push commits, some of them should address the issue.
@@ -36,13 +36,12 @@
 4. **Development Workflow**:  
    - Work only on the branch assigned to you.  
    - Regularly pull updates from the `development` branch and merge them into your branch to stay up-to-date (at least every two weeks).
-   - Build FTIO with the debug flag so that changes made in the directory are directly visible to the command line call without reinstalling FTIO. For that call:
+   - Build TMIO with the debug flag so that changes made in the directory are directly visible to the command line call without reinstalling TMIO. For that call:
 
      ```bash
-     cd <ftio_repo>
-     make debug #creates a virtual environment and install FTIO
-     # or
-     pip install -e .
+     cd <tmio_repo>
+	 cd build
+     make 
      ```
    - follow the [best practice guidelines](#best-practices) to ensure code compatibility and a smooth experience for all developers
 
@@ -81,7 +80,7 @@
   Example:
 
   ```bash
-  git commit -m "FTIO: Add feature X to improve performance"
+  git commit -m "TMIO: Add feature X to improve performance"
   ```
 
   Afterwards, push your changes from *your* branch:
@@ -134,15 +133,15 @@
 
 ## Instructions for Adding an Example
 
-To demonstrate how to use `FTIO` with you new feature, you should add a relevant example under the `examples` directory:
+To demonstrate how to use `TMIO` with you new feature, you should add a relevant example under the `examples` directory:
 
 1. **Create a new example script** in the `examples` folder.
-2. **Ensure the example is clear**, easy to understand, and includes proper usage of `FTIO`.
+2. **Ensure the example is clear**, easy to understand, and includes proper usage of `TMIO`.
 3. **Push and commit** your changes:
 
     ```bash
     git add examples/your_example.py
-    git commit -m "FTIO: Add example usage of feature XXX"
+    git commit -m "TMIO: Add example usage of feature XXX"
     ```
 
 ---
@@ -151,21 +150,24 @@ To demonstrate how to use `FTIO` with you new feature, you should add a relevant
 
 To add a test case for verifying your changes, follow these steps:
 
-1. **Write a new test script** in the `test` directory to check for the desired functionality of `FTIO`.
+1. **Write a new test script** in the `test` directory to check for the desired functionality of `TMIO`.
 2. **Ensure the test is clear** and isolates the tested functionality.
 3. **Push and commit** your changes:
 
     ```bash
     git add test/test_example.py
-    git commit -m "Add test case for FTIO read/write functionality"
+    git commit -m "Add test case for TMIO read/write functionality"
     ```
 
 4. **Regularly test your testcase**:
 
     ```bash
-    cd <ftio_repo>
-    make test
+    cd <tmio_repo>
+    make 
     ```
+
+> [!note]
+> We need some tests to examine the functionality.
 
 ---
 
@@ -179,10 +181,10 @@ To ensure proper documentation for your work, follow these steps:
 
     ```bash
     git add docs/example_usage.md
-    git commit -m "FTIO: Add documentation for feature XXX"
+    git commit -m "TMIO: Add documentation for feature XXX"
     ```
 
-4. if you made changes to the command line arguments, please update the usage section in the [readme](/README.md#usage).
+4. If you made changes to the command line arguments, please update the usage section in the [readme](/README.md#usage).
 
 ---
 
