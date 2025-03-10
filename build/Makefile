@@ -22,7 +22,7 @@
 SHELL      := /bin/bash
 VERSION    := 1.0.0
 
-PROCS         := 8  #set number of proccesses (2 --> 8)
+PROCS         := 4  #set number of proccesses (2 --> 8)
 OPENMPTHREADS := 4
 
 MPICXX = mpicxx
@@ -115,6 +115,10 @@ $(EXECUTABLE): $(OBJ_FILES)
 
 pre: 
 	@ ls  $(OBJ_DIR) &>  /dev/null || ( echo "creating Folder  $(OBJ_DIR)" && mkdir $(OBJ_DIR) )
+	@ ls $(OBJ_DIR)/test &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test" && mkdir -p $(OBJ_DIR)/test ) 
+	@ ls $(OBJ_DIR)/test/MPI &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test/MPI" && mkdir -p $(OBJ_DIR)/test/MPI )
+	@ ls $(OBJ_DIR)/test/libc &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test/libc" && mkdir -p $(OBJ_DIR)/test/libc )
+
 
 run:
 	echo $()
@@ -127,7 +131,6 @@ library: clean pre libtmio.so
 libtmio.so: CXX_FLAGS += -fPIC -Wall -shared
 libtmio.so:  $(OBJ_FILES_FOR_LIBRARY) 
 	$(MPICXX) $(CXX_FLAGS) -o $@ $^ $(CXX_LIB_FLAGS)
-
 
 #**************************************
 #*  ScoreP                            *
@@ -285,6 +288,62 @@ debug_code: CXX_DEBUG += -DFUNCTION_INFO=0 -DIOTRACE_VERBOSE=0 -DIODATA_VERBOSE=
 debug_code: all run
 
 
+#**************************************
+#*  Tests build                      *
+#**************************************
+
+# Filter out test.h and test.cxx from SRC_FILES and HED_FILES
+SRC_FILES_FOR_CATCH2 := $(filter-out $(SRC_DIR)/test.cxx, $(SRC_FILES))
+HED_FILES_FOR_CATCH2 := $(filter-out $(INC_DIR)/test.h, $(HED_FILES))
+OBJ_FILES_FOR_CATCH2 := $(filter-out $(OBJ_DIR)/test.o, $(OBJ_FILES))
+
+# Add a variable for the test executable
+TEST_EXECUTABLE_MPI := run_test_mpi
+TEST_EXECUTABLE_LIBC := run_test_libc
+
+# Add a variable for the test source directories
+TEST_SRC_DIR_MPI := $(TMIO_REPO)/test/MPI
+TEST_SRC_DIR_LIBC := $(TMIO_REPO)/test/libc
+
+# Add a variable for the test source files
+TEST_SRC_FILES_MPI := $(wildcard $(TEST_SRC_DIR_MPI)/*.cxx)
+TEST_SRC_FILES_LIBC := $(wildcard $(TEST_SRC_DIR_LIBC)/*.cxx)
+
+# Add a variable for the test object files
+TEST_OBJ_FILES_MPI := $(TEST_SRC_FILES_MPI:$(TMIO_REPO)/test/%.cxx=$(OBJ_DIR)/test/%.o)
+TEST_OBJ_FILES_LIBC := $(TEST_SRC_FILES_LIBC:$(TMIO_REPO)/test/%.cxx=$(OBJ_DIR)/test/%.o)
+
+# Add the include path for Catch2
+CXX_INC += -I$(TMIO_REPO)/lib/catch2 -I$(TMIO_REPO)/test/utils
+
+# Add a target for compiling the MPI test executable
+$(TEST_EXECUTABLE_MPI): $(TEST_OBJ_FILES_MPI) $(OBJ_FILES_FOR_CATCH2)
+	$(MPICXX) $(CXX_FLAGS) -o $@ $^ $(CXX_LIB_FLAGS)
+
+# Add a target for compiling the libc test executable
+$(TEST_EXECUTABLE_LIBC): $(TEST_OBJ_FILES_LIBC) $(OBJ_FILES_FOR_CATCH2)
+	$(MPICXX) $(CXX_FLAGS) -o $@ $^ $(CXX_LIB_FLAGS)
+
+# Add a target for running the MPI tests
+.PHONY: test_MPI
+test_MPI: $(TEST_EXECUTABLE_MPI) 
+	./$(TEST_EXECUTABLE_MPI)
+
+# Add a target for running the libc tests
+.PHONY: test_libc
+test_libc: $(TEST_EXECUTABLE_LIBC) 
+	./$(TEST_EXECUTABLE_LIBC)
+
+# Add a general test target that calls both test_MPI and test_libc, would first build the project
+.PHONY: test
+test: build
+test: test_MPI test_libc
+
+# Add a rule for compiling test object files
+$(OBJ_DIR)/test/%.o: $(TMIO_REPO)/test/%.cxx $(TMIO_REPO)/lib/catch2/catch.hpp $(SRC_FILES_FOR_CATCH2) $(HED_FILES_FOR_CATCH2)
+	@ mkdir -p $(OBJ_DIR)/test 
+	$(MPICXX) $(CXX_FLAGS) -c $< -o $@ -I$(INC_DIR) $(CXX_DEBUG) $(CXX_INC)
+
 
 
 #**************************************
@@ -301,6 +360,8 @@ clean_build:
 clean: clean_build
 	@ rm -f $(EXECUTABLE)
 	@ rm -rf $(OBJ_DIR)
+	@ rm -f $(TEST_EXECUTABLE_MPI)
+	@ rm -f $(TEST_EXECUTABLE_LIBC)
 	@ rm -f *.json *.jsonl *.msgpack *.bin*
 	@ rm -f libtmio.so
 
