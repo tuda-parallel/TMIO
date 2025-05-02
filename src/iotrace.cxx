@@ -113,7 +113,7 @@ void IOtrace::Summary(void)
     p_sw->Bandwidth_In_Phase_Offline();
     p_sr->Bandwidth_In_Phase_Offline();
 #endif
-
+    // [Note] Should it be number of I/O phrase?
     // number of I/O operations each rank performed ({async write, async read, sync write, sync read})
     n_struct n = {
 				(int)p_aw->phase_data.size(),
@@ -242,7 +242,6 @@ void IOtrace::Summary(void)
 			#endif
 			
 		}
-
         Time_Info("Printing done >");
         s_aw.Clean();
         s_ar.Clean();
@@ -260,7 +259,7 @@ void IOtrace::Summary(void)
         free(time);
     }
     if (!finalize){
-        t_summary =  MPI_Wtime() - t_0;
+        t_summary =  MPI_Wtime() - t_0; // FIXME: 我知道为啥91行把这东西给删了，让我不明白的是为什么264行是MPI_Wtime() - t_0而不是MPI_Wtime()，另外，你说的Summary是不是意思包括数据的收集过程，不仅仅只是包含数据的Summary
         delta_t_app = 0;
         delta_t_io_overhead = 0;    
 
@@ -299,6 +298,8 @@ void IOtrace::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *r
     async_write_size.push_back(count * data_size_write);
 
     // phase start if first request. Add phase data and offset
+    // [Note] Start of Async Phrase is control by if `async_write_time` is empty, instead of `phrase`
+    // [Note] Since Sync/Async are tracked separately, not need to consider the merge of both
     p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset);
 
     // save request flag and set request counter (required and actual to one)
@@ -726,6 +727,7 @@ bool IOtrace::
  */
 bool IOtrace::Check_Request_Read(MPI_Request *request, double *start_time, long long *size, int mode)
 {
+    // FIXME: Add pthread lock to protect the following variables
     if (!async_read_request.empty())
     {
         for (unsigned int i = 0; i < async_read_request.size(); i++)
@@ -865,14 +867,14 @@ double *IOtrace::Overhead_Calculation(void)
 #endif
 
     double tmp_time[n_time];
-    tmp_time[0] = delta_t_app; // application runtime
+    tmp_time[0] = delta_t_app; // application runtime including in-period overhead, not include summary overhead
 
 #if OVERHEAD == 1
-    tmp_time[2] = delta_t_io_overhead; // overhead during applicaiton runtime
+    tmp_time[2] = delta_t_io_overhead; // in-period overhead during applicaiton runtime
 #endif
 
     // tmp_time[1] = (MPI_Wtime() - t_0) - delta_t_app; // overhead after application finishes
-    tmp_time[1] = (MPI_Wtime() - t_summary) - delta_t_app; // overhead after application finishes
+    tmp_time[1] = (MPI_Wtime() - t_summary) - delta_t_app; // summary overhead after application finishes
 
     if (rank == 0)
         time_array = (double *)malloc(sizeof(double) * n_time);

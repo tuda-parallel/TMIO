@@ -86,7 +86,7 @@ collect *ioanalysis::Gather_Collect(IOdata *iodata, int *n, int rank, int proces
 		int sum = 0;
 		for (int i = 0; i < processes; i++)
 		{
-			displacement[i] = (i > 0) ? displacement[i - 1] + n[i - 1] : 0;
+			displacement[i] = (i > 0) ? displacement[i - 1] + n[i - 1] : 0; // [Note] Exclusive Prefix Sum
 			sum += n[i];
 		}
 

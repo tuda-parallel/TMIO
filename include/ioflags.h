@@ -1,6 +1,20 @@
 #ifndef IOFLAGS 
 #define IOFLAGS
 
+//* ENABLE TRACING
+//*******************************
+#ifndef ENABLE_MPI_TRACE
+#define ENABLE_MPI_TRACE 1 // set to 1 to enable tracing
+// 0: disable tracing
+// 1: enable tracing
+#endif
+
+#ifndef ENABLE_LIBC_TRACE
+#define ENABLE_LIBC_TRACE 1 // set to 1 to enable tracing
+// 0: disable tracing
+// 1: enable tracing
+#endif
+
 
 
 //* DEBUG Flags

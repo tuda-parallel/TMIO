@@ -22,7 +22,7 @@
 SHELL      := /bin/bash
 VERSION    := 1.0.0
 
-PROCS         := 4  #set number of proccesses (2 --> 8)
+PROCS         := 2  #set number of proccesses (2 --> 8)
 OPENMPTHREADS := 4
 
 MPICXX = mpicxx
@@ -80,9 +80,15 @@ OBJ_DIR    := tmp
 DEP_DIR    := $(TMIO_REPO)/dep
 
 
-SRC_FILES  := $(wildcard $(SRC_DIR)/*.cxx)
-HED_FILES  := $(wildcard $(INC_DIR)/*.h)
-OBJ_FILES  := $(SRC_FILES:$(SRC_DIR)/%.cxx=$(OBJ_DIR)/%.o)
+# SRC_FILES  := $(wildcard $(SRC_DIR)/*.cxx)
+# HED_FILES  := $(wildcard $(INC_DIR)/*.h)
+# OBJ_FILES  := $(SRC_FILES:$(SRC_DIR)/%.cxx=$(OBJ_DIR)/%.o)
+
+# Recursively find all source and header files
+SRC_FILES  := $(shell find $(SRC_DIR) -name '*.cxx')
+HED_FILES  := $(shell find $(INC_DIR) -name '*.h')
+# Map source files to object files, preserving subdirectory structure
+OBJ_FILES  := $(patsubst $(SRC_DIR)/%.cxx, $(OBJ_DIR)/%.o, $(SRC_FILES))
 
 LIBRARIES  :=
 OBJ_FILES_FOR_LIBRARY := $(filter-out $(OBJ_DIR)/test.o, $(OBJ_FILES))
@@ -104,7 +110,7 @@ all: clean_build build run
 build: CXX_DEBUG += -DTMIO=1
 build: pre $(EXECUTABLE)
 # build object files  
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cxx $(INC_DIR)/%.h
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cxx $(HED_FILES)
 	$(MPICXX) $(CXX_FLAGS) -c  $< -o  $@ -I$(INC_DIR) $(CXX_DEBUG) $(CXX_INC)
 
 # $(EXECUTABLE): CXX_DEBUG += -DTMIO=1
@@ -114,7 +120,9 @@ $(EXECUTABLE): $(OBJ_FILES)
 
 
 pre: 
-	@ ls  $(OBJ_DIR) &>  /dev/null || ( echo "creating Folder  $(OBJ_DIR)" && mkdir $(OBJ_DIR) )
+	@ mkdir -p $(OBJ_DIR) 
+	@ mkdir -p $(dir $(OBJ_FILES)) 
+	@ ls $(OBJ_DIR) &>  /dev/null || ( echo "creating Folder  $(OBJ_DIR)" && mkdir $(OBJ_DIR) )
 	@ ls $(OBJ_DIR)/test &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test" && mkdir -p $(OBJ_DIR)/test ) 
 	@ ls $(OBJ_DIR)/test/MPI &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test/MPI" && mkdir -p $(OBJ_DIR)/test/MPI )
 	@ ls $(OBJ_DIR)/test/libc &> /dev/null || ( echo "creating Folder $(OBJ_DIR)/test/libc" && mkdir -p $(OBJ_DIR)/test/libc )
@@ -326,8 +334,8 @@ $(TEST_EXECUTABLE_LIBC): $(TEST_OBJ_FILES_LIBC) $(OBJ_FILES_FOR_CATCH2)
 
 # Add a target for running the MPI tests
 .PHONY: test_MPI
-test_MPI: $(TEST_EXECUTABLE_MPI) 
-	./$(TEST_EXECUTABLE_MPI)
+test_MPI: $(TEST_EXECUTABLE_MPI)
+	$(MPIRUN) -np $(PROCS) ./$(TEST_EXECUTABLE_MPI) 
 
 # Add a target for running the libc tests
 .PHONY: test_libc

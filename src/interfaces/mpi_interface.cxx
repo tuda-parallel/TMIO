@@ -1,4 +1,8 @@
 #include "tmio.h"
+#include <fcntl.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <stdio.h>
 
 /**
  *  iotrace trace class
@@ -8,9 +12,10 @@
  * @date	05.08.2021
  */
 
-
+#if ENABLE_MPI_TRACE == 1
 //! -----------------------Set up variables ------------------------------
-IOtrace iotrace;
+IOtrace mpi_iotrace;
+#endif
 
 //! ----------------------- Init and Finilize ------------------------------
 
@@ -18,10 +23,12 @@ IOtrace iotrace;
 //*							 1. MPI_Init
 //**********************************************************************
 int MPI_Init(int *argc, char ***argv)
-{	
+{
 	Function_Debug(__PRETTY_FUNCTION__);
 	int result = PMPI_Init(argc, argv);
-	iotrace.Init();
+#if ENABLE_MPI_TRACE == 1
+	mpi_iotrace.Init();
+#endif
 	return result;
 }
 
@@ -32,7 +39,9 @@ int MPI_Init_thread(int *argc, char ***argv, int required, int *provided)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 	int result = PMPI_Init_thread(argc, argv, required, provided);
-	iotrace.Init();
+#if ENABLE_MPI_TRACE == 1
+	mpi_iotrace.Init();
+#endif
 	return result;
 }
 //**********************************************************************
@@ -41,12 +50,15 @@ int MPI_Init_thread(int *argc, char ***argv, int required, int *provided)
 int MPI_Finalize()
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Set("finalize",true);
-	iotrace.Summary();
+#if ENABLE_MPI_TRACE == 1
+	mpi_iotrace.Set("finalize", true);
+	mpi_iotrace.Summary();
+#endif
 	return PMPI_Finalize();
 }
 
 //! ----------------------- Open and Close ------------------------------
+#ifdef ENABLE_MPI_TRACE
 
 //**********************************************************************
 //*							 1. MPI_File_open
@@ -54,7 +66,7 @@ int MPI_Finalize()
 int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info, MPI_File *fh)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Open();
+	mpi_iotrace.Open();
 	return PMPI_File_open(comm, filename, amode, info, fh);
 }
 
@@ -64,7 +76,7 @@ int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info,
 int MPI_File_close(MPI_File *fh)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Close();
+	mpi_iotrace.Close();
 	return PMPI_File_close(fh);
 }
 
@@ -76,7 +88,7 @@ int MPI_File_close(MPI_File *fh)
 int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Async_Start(count, datatype, request);
+	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite(fh, buf, count, datatype, request);
 }
 
@@ -86,7 +98,7 @@ int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype dataty
 int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Async_Start(count, datatype, request, offset);
+	mpi_iotrace.Write_Async_Start(count, datatype, request, offset);
 	return PMPI_File_iwrite_at(fh, offset, buf, count, datatype, request);
 }
 
@@ -96,7 +108,7 @@ int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int coun
 int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Async_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
 	return PMPI_File_iwrite_all(fh, buf, count, datatype, request);
 }
 
@@ -106,7 +118,7 @@ int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype da
 int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Async_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
 	return PMPI_File_iwrite_at_all(fh, offset, buf, count, datatype, request);
 }
 
@@ -117,7 +129,7 @@ int MPI_File_iwrite_shared(MPI_File fh, const void *buf, int count, MPI_Datatype
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 
-	iotrace.Write_Async_Start(count, datatype, request);
+	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite_shared(fh, buf, count, datatype, request);
 }
 
@@ -129,9 +141,9 @@ int MPI_File_iwrite_shared(MPI_File fh, const void *buf, int count, MPI_Datatype
 int MPI_File_write(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Sync_Start(count, datatype);
+	mpi_iotrace.Write_Sync_Start(count, datatype);
 	int result = PMPI_File_write(fh, buf, count, datatype, status);
-	iotrace.Write_Sync_End();
+	mpi_iotrace.Write_Sync_End();
 	return result;
 }
 
@@ -141,9 +153,9 @@ int MPI_File_write(MPI_File fh, const void *buf, int count, MPI_Datatype datatyp
 int MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Sync_Start(count, datatype, offset);
+	mpi_iotrace.Write_Sync_Start(count, datatype, offset);
 	int result = PMPI_File_write_at(fh, offset, buf, count, datatype, status);
-	iotrace.Write_Sync_End();
+	mpi_iotrace.Write_Sync_End();
 	return result;
 }
 
@@ -153,9 +165,9 @@ int MPI_File_write_at(MPI_File fh, MPI_Offset offset, const void *buf, int count
 int MPI_File_write_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Sync_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype);
+	mpi_iotrace.Write_Sync_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype);
 	int result = PMPI_File_write_all(fh, buf, count, datatype, status);
-	iotrace.Write_Sync_End();
+	mpi_iotrace.Write_Sync_End();
 	return result;
 }
 
@@ -165,9 +177,9 @@ int MPI_File_write_all(MPI_File fh, const void *buf, int count, MPI_Datatype dat
 int MPI_File_write_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Sync_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, offset);
+	mpi_iotrace.Write_Sync_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, offset);
 	int result = PMPI_File_write_at_all(fh, offset, buf, count, datatype, status);
-	iotrace.Write_Sync_End();
+	mpi_iotrace.Write_Sync_End();
 	return result;
 }
 
@@ -177,9 +189,9 @@ int MPI_File_write_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int c
 int MPI_File_write_shared(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Sync_Start(count, datatype);
+	mpi_iotrace.Write_Sync_Start(count, datatype);
 	int result = PMPI_File_write_shared(fh, buf, count, datatype, status);
-	iotrace.Write_Sync_End();
+	mpi_iotrace.Write_Sync_End();
 	return result;
 }
 
@@ -191,7 +203,7 @@ int MPI_File_write_shared(MPI_File fh, const void *buf, int count, MPI_Datatype 
 int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Async_Start(count, datatype, request);
+	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread(fh, buf, count, datatype, request);
 }
 
@@ -201,7 +213,7 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Async_Start(count, datatype, request);
+	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_at(fh, offset, buf, count, datatype, request);
 }
 
@@ -211,7 +223,7 @@ int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_
 int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Async_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
 	return PMPI_File_iread_all(fh, buf, count, datatype, request);
 }
 
@@ -221,7 +233,7 @@ int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype,
 int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Async_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
 	return PMPI_File_iread_at_all(fh, offset, buf, count, datatype, request);
 }
 
@@ -232,7 +244,7 @@ int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype dataty
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 
-	iotrace.Read_Async_Start(count, datatype, request);
+	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_shared(fh, buf, count, datatype, request);
 }
 
@@ -244,9 +256,9 @@ int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype dataty
 int MPI_File_read(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Sync_Start(count, datatype);
+	mpi_iotrace.Read_Sync_Start(count, datatype);
 	int result = PMPI_File_read(fh, buf, count, datatype, status);
-	iotrace.Read_Sync_End();
+	mpi_iotrace.Read_Sync_End();
 	return result;
 }
 
@@ -256,9 +268,9 @@ int MPI_File_read(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_
 int MPI_File_read_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Sync_Start(count, datatype, offset);
+	mpi_iotrace.Read_Sync_Start(count, datatype, offset);
 	int result = PMPI_File_read_at(fh, offset, buf, count, datatype, status);
-	iotrace.Read_Sync_End();
+	mpi_iotrace.Read_Sync_End();
 	return result;
 }
 
@@ -268,9 +280,9 @@ int MPI_File_read_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_D
 int MPI_File_read_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Sync_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype);
+	mpi_iotrace.Read_Sync_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype);
 	int result = PMPI_File_read_all(fh, buf, count, datatype, status);
-	iotrace.Read_Sync_End();
+	mpi_iotrace.Read_Sync_End();
 	return result;
 }
 
@@ -280,9 +292,9 @@ int MPI_File_read_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, 
 int MPI_File_read_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Sync_Start(count / iotrace.Get_Relevant_Ranks(fh), datatype, offset);
+	mpi_iotrace.Read_Sync_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, offset);
 	int result = PMPI_File_read_at_all(fh, offset, buf, count, datatype, status);
-	iotrace.Read_Sync_End();
+	mpi_iotrace.Read_Sync_End();
 	return result;
 }
 
@@ -292,9 +304,9 @@ int MPI_File_read_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, M
 int MPI_File_read_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Read_Sync_Start(count, datatype);
+	mpi_iotrace.Read_Sync_Start(count, datatype);
 	int result = PMPI_File_read_shared(fh, buf, count, datatype, status);
-	iotrace.Read_Sync_End();
+	mpi_iotrace.Read_Sync_End();
 	return result;
 }
 
@@ -306,16 +318,16 @@ int MPI_File_read_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatyp
 int MPI_Wait(MPI_Request *request, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace.Write_Async_Required(request);
-	iotrace.Read_Async_Required(request);
+	mpi_iotrace.Write_Async_Required(request);
+	mpi_iotrace.Read_Async_Required(request);
 	int result = PMPI_Wait(request, status);
-	iotrace.Write_Async_End(request);
-	iotrace.Read_Async_End(request);
-	#if defined BW_LIMIT
-		iotrace.Apply_Limit();
-	#elif defined CUSTOM_MPI
-		iotrace.Replace_Test();
-	#endif 
+	mpi_iotrace.Write_Async_End(request);
+	mpi_iotrace.Read_Async_End(request);
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit();
+#elif defined CUSTOM_MPI
+	mpi_iotrace.Replace_Test();
+#endif
 	return result;
 }
 
@@ -327,20 +339,20 @@ int MPI_Waitall(int count, MPI_Request requests[], MPI_Status statuses[])
 	Function_Debug(__PRETTY_FUNCTION__);
 	for (int i = 0; i < count; i++)
 	{
-		iotrace.Write_Async_Required(requests + i);
-		iotrace.Read_Async_Required(requests + i);
+		mpi_iotrace.Write_Async_Required(requests + i);
+		mpi_iotrace.Read_Async_Required(requests + i);
 	}
 	int result = PMPI_Waitall(count, requests, statuses);
 	for (int i = 0; i < count; i++)
 	{
-		iotrace.Write_Async_End(requests + i);
-		iotrace.Read_Async_End(requests + i);
+		mpi_iotrace.Write_Async_End(requests + i);
+		mpi_iotrace.Read_Async_End(requests + i);
 	}
-	#if defined BW_LIMIT
-		iotrace.Apply_Limit();
-	#elif defined CUSTOM_MPI
-		iotrace.Replace_Test();
-	#endif 
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit();
+#elif defined CUSTOM_MPI
+	mpi_iotrace.Replace_Test();
+#endif
 	return result;
 }
 
@@ -352,8 +364,8 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status)
 	Function_Debug(__PRETTY_FUNCTION__, *flag);
 	int result = PMPI_Test(request, flag, status);
 #if TEST == 1
-	iotrace.Write_Async_End(request, *flag);
-	iotrace.Read_Async_End(request, *flag);
+	mpi_iotrace.Write_Async_End(request, *flag);
+	mpi_iotrace.Read_Async_End(request, *flag);
 #endif
 	return result;
 }
@@ -368,42 +380,11 @@ int MPI_Testall(int count, MPI_Request *requests, int *flag, MPI_Status *statuse
 #if TEST == 1
 	for (int i = 0; i < count; i++)
 	{
-		iotrace.Write_Async_End(requests + i, *flag);
-		iotrace.Read_Async_End(requests + i, *flag);
+		mpi_iotrace.Write_Async_End(requests + i, *flag);
+		mpi_iotrace.Read_Async_End(requests + i, *flag);
 	}
 #endif
 	return result;
 }
 
-void Function_Debug(std::string function_name, int test_flag)
-{
-#if FUNCTION_INFO == 1
-
-	std::string s_test = "MPI_Test";
-	static int test_counter = 0;
-	static bool flag = true;
-	static int flag_2 = 0;
-	if (function_name.find(s_test) != std::string::npos)
-	{
-		if (flag)
-		{
-			std::cout << "\tTMIO  > " << BLUE << "\t> executing " << function_name << BLACK << std::endl;
-			flag = false;
-		}
-		test_counter++;
-	}
-	else
-	{
-		if ((test_counter) > 0)
-		{
-			std::cout << "\tTMIO  > " << BLUE << "\t> executed " << RED << test_counter << BLUE << " "
-					<< "int MPI_Test(ompi_request_t**, int*, MPI_Status*)\n"
-					<< BLACK;
-			test_counter = 0;
-		}
-		std::cout << "\tTMIO  > " << BLUE << "\t> executing " << function_name << BLACK << std::endl;
-		flag = true;
-	}
-	fflush(stdout);
-#endif
-}
+#endif // ENABLE_MPI_TRACE

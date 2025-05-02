@@ -238,12 +238,11 @@ void read_from_file(std::string filename, int rank, int mode, int size, int N, i
 #if DEBUG >= 1
             std::cout << "real read: " << read_doubles * sizeof(MPI_DOUBLE) / 1000 << " KB \n";
 #endif
-            free(read_array);
             MPI_File_close(&mpi_file);
 #if DEBUG >= 1
             printf("\n%d Process were in totoal used with %d IO phases. In each run %d doubles were generated =  %d doubles in totoal = %lu KB \n", size, (counter - 1), N, N * size * (counter - 1), (sizeof(MPI_DOUBLE) * N * size * (counter - 1)) / 1000);
 #endif
-#if DEBUG >= 3
+#if DEBUG >= 4
             {
                 printf("values are:\n[");
                 for (int i = 0; i < read_doubles; i++)
@@ -255,6 +254,7 @@ void read_from_file(std::string filename, int rank, int mode, int size, int N, i
             }
             printf("]\n\n -------------------------- End --------------------------\n\n");
 #endif
+            free(read_array);
         }
     }
 

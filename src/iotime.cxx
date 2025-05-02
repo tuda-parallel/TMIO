@@ -60,9 +60,13 @@ iotime::iotime(double *t, double *t_rank_0, statistics sr, statistics ar, statis
 	delta_t_agg_io = delta_t_aw_lost + delta_t_ar_lost + delta_t_sr + delta_t_sw;
 	deta_t_rank0_vec = t_rank_0;
 	// rank 0 time
+	// [Note] Last Actual application escape time
 	delta_t_rank0 = deta_t_rank0_vec[0] + deta_t_rank0_vec[2];
+	// [Note] Last Application escape time without in-period measurement overhead
 	delta_t_rank0_app = deta_t_rank0_vec[0] - deta_t_rank0_vec[1];
+	// [Note] Last Summary overhead after application finishes
 	delta_t_rank0_overhead_post_runtime = deta_t_rank0_vec[2];
+	// [Note] Last In-period measurement overhead during applicaiton runtime
 	delta_t_rank0_overhead_peri_runtime = deta_t_rank0_vec[1];
 }
 
