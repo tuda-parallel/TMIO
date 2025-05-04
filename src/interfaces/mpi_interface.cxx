@@ -14,7 +14,7 @@
 
 #if ENABLE_MPI_TRACE == 1
 //! -----------------------Set up variables ------------------------------
-IOtrace mpi_iotrace;
+IOtraceMPI mpi_iotrace;
 #endif
 
 //! ----------------------- Init and Finilize ------------------------------
@@ -26,9 +26,7 @@ int MPI_Init(int *argc, char ***argv)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 	int result = PMPI_Init(argc, argv);
-#if ENABLE_MPI_TRACE == 1
-	mpi_iotrace.Init();
-#endif
+	iotrace_init_helper();
 	return result;
 }
 
@@ -39,9 +37,7 @@ int MPI_Init_thread(int *argc, char ***argv, int required, int *provided)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 	int result = PMPI_Init_thread(argc, argv, required, provided);
-#if ENABLE_MPI_TRACE == 1
-	mpi_iotrace.Init();
-#endif
+	iotrace_init_helper();
 	return result;
 }
 //**********************************************************************
@@ -50,10 +46,7 @@ int MPI_Init_thread(int *argc, char ***argv, int required, int *provided)
 int MPI_Finalize()
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if ENABLE_MPI_TRACE == 1
-	mpi_iotrace.Set("finalize", true);
-	mpi_iotrace.Summary();
-#endif
+	iotrace_finalize_helper();
 	return PMPI_Finalize();
 }
 

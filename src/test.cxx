@@ -97,14 +97,14 @@ int main(int argc, char *argv[])
     */
     int mode = 0;
     mode = 1;
-    //mode = 2;
-    //mode = 3;
-    //mode = 4;
-    // mode = 5;
-    // mode = 6;
-    //mode = 7;
-    //mode = 8;
-    //mode = 9;
+    mode = 2;
+    mode = 3;
+    mode = 4;
+    mode = 5;
+    mode = 6;
+    mode = 7;
+    mode = 8;
+    mode = 9;
 
     //? 2)
     //? which ranks should do collective IO (mode 3 and 6) --> if not all, set all=0 and adjust n_collective_ranks & collective_ranks

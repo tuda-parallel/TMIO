@@ -9,6 +9,7 @@ namespace ioprint
 	/**
 	 * @brief prints summary as a text file and to stdout
 	 *
+	 * @param kLibName name of the traced lib
 	 * @param processes
 	 * @param read_sync
 	 * @param read_async
@@ -16,7 +17,7 @@ namespace ioprint
 	 * @param write_async
 	 * @param io_time
 	 */
-	void Summary(int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
+	void Summary(const char *kLibName, int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
 	{
 
 		int values = 142;
@@ -39,12 +40,14 @@ namespace ioprint
 
 		char out[values][150];
 		std::ofstream myfile;
-		myfile.open(std::to_string(processes) + ".txt");
+		std::string file_name = std::to_string(processes) + "_" + std::string(kLibName) + ".txt";
+		myfile.open(file_name);
 		std::string unit = "B";
 		double unit_scale = 1;
 		int counter = 0;
 
 		sprintf(out[counter++], "\n\nSummary\n***************************\n");
+		sprintf(out[counter++], "I/O library: %s\n", kLibName);
 		sprintf(out[counter++], "Ranks: %i \n", processes);
 		sprintf(out[counter++], "\n _________________Read_________________\n");
 		sprintf(out[counter++], "|\n");
@@ -339,6 +342,7 @@ namespace ioprint
 	/**
 	 * @brief Create json file
 	 *
+	 * @param kLibName
 	 * @param processes
 	 * @param read_sync
 	 * @param read_async
@@ -346,18 +350,19 @@ namespace ioprint
 	 * @param write_async
 	 * @param io_time
 	 */
-	void Jsonl(int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
+	void Jsonl(const char *kLibName, int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
 	{
 		std::ofstream file;
 		static bool first_time = true;
+		std::string file_name = std::to_string(processes) + "_" + std::string(kLibName) + ".jsonl";
 		if (first_time)
 		{
-			file.open(std::to_string(processes) + ".jsonl");
+			file.open(file_name);
 			first_time = false;
 		}
 		else
 		{
-			file.open(std::to_string(processes) + ".jsonl", std::ios_base::app);
+			file.open(file_name, std::ios_base::app);
 		}
 
 		std::string print = Format_Json(read_sync, "read_sync", false, true);
@@ -378,6 +383,7 @@ namespace ioprint
 	/**
 	 * @brief Create json file
 	 *
+	 * @param kLibName
 	 * @param processes
 	 * @param read_sync
 	 * @param read_async
@@ -385,10 +391,11 @@ namespace ioprint
 	 * @param write_async
 	 * @param io_time
 	 */
-	void Json(int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
+	void Json(const char *kLibName, int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
 	{
 		std::ofstream file;
-		file.open(std::to_string(processes) + ".json");
+		std::string file_name = std::to_string(processes) + "_" + std::string(kLibName) + ".json";
+		file.open(file_name);
 		file << "{\n";
 		std::string print = Format_Json(read_sync, "read_sync");
 		print.append(Format_Json(read_async, "read_async_t"));
@@ -651,7 +658,7 @@ namespace ioprint
 		return out;
 	}
 
-	void Binary(int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
+	void Binary(const char *kLibName, int processes, statistics read_sync, statistics read_async, statistics write_sync, statistics write_async, iotime io_time)
 	{
 
 		static int chunk = 0;
@@ -675,7 +682,7 @@ namespace ioprint
 		print.append(Format_Json(write_sync, "write_sync", false, true));
 		print.append(io_time.Print_Json(true));
 
-		std::string name = std::to_string(processes) + ".bin" + "_chunk_" + std::to_string(chunk);
+		std::string name = std::to_string(processes) + "_" + std::string(kLibName) + ".bin" + "_chunk_" + std::to_string(chunk);
 		auto flag = std::ios_base::binary;
 		std::ofstream file(name, flag);
 		if (file.is_open())
@@ -687,7 +694,7 @@ namespace ioprint
 #elif FILE_FORMAT == 2 // MSGPACK
 
 		//? 1) One file:
-		std::string name = std::to_string(processes) + ".msgpack";
+		std::string name = std::to_string(processes) + "_" + std::string(kLibName) + ".msgpack";
 		static bool first_time = true;
 		auto flag = std::ios_base::binary | std::ios_base::app;
 		if (first_time)
@@ -696,7 +703,7 @@ namespace ioprint
 			first_time = false;
 		}
 		//? 2) Several files
-		// std::string name = std::to_string(processes) + ".msgpack" + "_chunk_" + std::to_string(chunk) ;
+		// std::string name = std::to_string(processes)+ "_" +std::string(kLibName) + ".msgpack" + "_chunk_" + std::to_string(chunk) ;
 		// auto flag = std::ios_base::binary;
 		std::ofstream file(name, flag);
 
@@ -730,12 +737,12 @@ namespace ioprint
 		// prepare message
 		zmq::message_t message(buffer.size());
 		memcpy(message.data(), buffer.data(), buffer.size());
-		
+
 		// send message
 		zmq::socket_t sender(context, ZMQ_PUSH);
 		sender.connect(port);
 		sender.send(message, zmq::send_flags::none);
-		printf("Sending over port %s",port.c_str());
+		printf("Sending over port %s", port.c_str());
 #endif
 
 		chunk++;

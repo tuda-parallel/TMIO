@@ -1,4 +1,33 @@
 #include "tmio_helper_functions.h"
+#include "tmio.h"
+#include "iotrace.h"
+#include "ioflags.h"
+
+void iotrace_init_helper()
+{
+#if ENABLE_MPI_TRACE == 1
+	mpi_iotrace.Init();
+#endif
+
+#if ENABLE_LIBC_TRACE == 1
+	libc_iotrace.Init();
+#endif
+}
+
+void iotrace_finalize_helper()
+{
+    
+#if ENABLE_MPI_TRACE == 1
+	mpi_iotrace.Set("finalize", true);
+	mpi_iotrace.Summary();
+#endif
+
+#if ENABLE_LIBC_TRACE == 1
+	libc_iotrace.Set("finalize", true);
+	libc_iotrace.Summary();
+#endif
+}
+	
 
 void Function_Debug(std::string function_name, int test_flag)
 {

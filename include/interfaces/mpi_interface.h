@@ -1,8 +1,7 @@
 #ifndef MPI_INTERFACE_H
 #define MPI_INTERFACE_H
 
-
-extern IOtrace mpi_iotrace; //allows to access iotrace in application code 
+extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code 
 
 //! -----------------------
 //! Traced MPI Function 

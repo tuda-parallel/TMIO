@@ -43,6 +43,9 @@
 //! debug
 void Function_Debug(std::string function_name, int flag = 0);
 
+void iotrace_init_helper();
+void iotrace_finalize_helper();
+
 // std::atomic<uint64_t> request_id_counter(0);
 // uint64_t generate_unique_id()
 // {
