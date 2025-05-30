@@ -252,13 +252,19 @@ public:
 	//*************************************
 	//* TODO: Libc Write tracing
 	//*************************************
-	void Write_Sync_Start(size_t count, off_t offset = 0);
+	void Write_Async_Start(const struct aiocb *aiocbp);
+	void Write_Async_End(const struct aiocb *aiocbp, int write_status = 1);
+	void Write_Async_Required(const struct aiocb *aiocbp);
+	void Write_Sync_Start(size_t count, off64_t offset = 0);
 	void Write_Sync_End(void);
 
 	//*************************************
 	//* TODO: Libc Read tracing
 	//*************************************
-	void Read_Sync_Start(size_t count, off_t offset = 0);
+	void Read_Async_Start(const struct aiocb *aiocbp);
+	void Read_Async_End(const struct aiocb *aiocbp, int read_status = 1);
+	void Read_Async_Required(const struct aiocb *aiocbp);
+	void Read_Sync_Start(size_t count, off64_t offset = 0);
 	void Read_Sync_End(void);
 };
 
