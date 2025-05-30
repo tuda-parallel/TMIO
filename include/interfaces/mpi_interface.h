@@ -1,5 +1,6 @@
 #ifndef MPI_INTERFACE_H
 #define MPI_INTERFACE_H
+#include "tmio.h"
 
 extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code 
 

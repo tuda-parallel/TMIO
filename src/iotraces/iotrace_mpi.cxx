@@ -30,16 +30,16 @@ void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request
     async_write_queue_req.push_back(1);
     async_write_queue_act.push_back(1);
 
-#if IOTRACE_VERBOSE >= 1
-    static long int counter = 1;
-    printf("%s > rank %i > #%li will asnyc write %i x %i = %lli bytes \n", caller, rank, counter++, count, data_size_write, async_write_size.back());
-#endif
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> started asnyc write @ %f s %s\n", caller, rank, GREEN, async_write_time.back(), BLACK);
-#endif
-#if IOTRACE_VERBOSE >= 3
-    printf("%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-#endif
+    IOtraceMPI::LogWithAction<VerbosityLevel::BASIC_LOG>([&]()
+                                                         {
+        static long int counter = 1;
+        IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
+            "%s > rank %i > #%li will async write %i x %i = %lli bytes\n",
+            caller, rank, counter++, count, data_size_write, async_write_size.back()); });
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started asnyc write @ %f s %s\n", caller, rank, GREEN, async_write_time.back(), BLACK);
+    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
 
     Overhead_End();
 }
@@ -67,20 +67,16 @@ void IOtraceMPI::Write_Async_End(MPI_Request *request, int write_status)
             // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_request.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
             p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
 
-#if IOTRACE_VERBOSE >= 2
-            printf("%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
-            // iohf::Disp(async_write_queue_act, async_write_queue_act.size(), std::string(caller) + " > rank " + std::to_string(rank) + " >> async_write_queue_act ", 1);
-#endif
-#if IOTRACE_VERBOSE >= 3
-            printf("%s > rank %i %s>> write async requests ended at %f %s\n", caller, rank, RED, p_aw->phase_data.back().t_end_act, BLACK);
-#endif
+            IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+                "%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
+            IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+                "%s > rank %i %s>> write async requests ended at %f %s\n", caller, rank, RED, p_aw->phase_data.back().t_end_act, BLACK);
         }
     }
 
-#if IOTRACE_VERBOSE >= 4
-    if (write_status == 0)
-        printf("%s > rank %i %s>>>> testing for asnc write completion %s\n", caller, rank, RED, BLACK);
-#endif
+    IOtraceMPI::LogWithCondition<VerbosityLevel::DEBUG_LOG>(
+        write_status == 0,
+        "%s > rank %i %s>>>> testing for asnc write completion %s\n", caller, rank, RED, BLACK);
 
     Overhead_End();
 }
@@ -101,9 +97,8 @@ void IOtraceMPI::Write_Async_Required(MPI_Request *request)
     {
         p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0);
 
-#if IOTRACE_VERBOSE >= 2
-        printf("%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
-#endif
+        IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+            "%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
     }
     Overhead_End();
 }
@@ -136,17 +131,16 @@ void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request 
     async_read_queue_req.push_back(1);
     async_read_queue_act.push_back(1);
 
-#if IOTRACE_VERBOSE >= 1
-    static long int counter = 1;
-    printf("%s > rank %i > #%li will asnyc read %i x %i = %lli bytes \n", caller, rank, counter++, count, data_size_read, async_read_size.back());
-#endif
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> started asnyc read @ %f s %s\n", caller, rank, GREEN, async_read_time.back(), BLACK);
-#endif
-#if IOTRACE_VERBOSE >= 3
-    printf("%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-#endif
-
+    IOtraceMPI::LogWithAction<VerbosityLevel::BASIC_LOG>([&]()
+                                                         {
+        static long int counter = 1;
+        IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
+            "%s > rank %i > #%li will asnyc read %i x %i = %lli bytes \n",
+                    caller, rank, counter++, count, data_size_read, async_read_size.back()); });
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started asnyc read @ %f s %s\n", caller, rank, GREEN, async_read_time.back(), BLACK);
+    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
     Overhead_End();
 }
 
@@ -173,20 +167,18 @@ void IOtraceMPI::Read_Async_End(MPI_Request *request, int read_status)
             p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, Act_Done(1));
             // std::cout << "Act_Done return" << Act_Done(1) << std::endl;
 
-#if IOTRACE_VERBOSE >= 2
-            printf("%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
-            iohf::Disp(async_read_queue_act, async_read_queue_act.size(), std::string(caller) + " > rank " + std::to_string(rank) + " >> async_read_queue_act ", 1);
-#endif
-#if IOTRACE_VERBOSE >= 3
-            printf("%s > rank %i %s>> read async requests ended at %f %s\n", caller, rank, RED, p_ar->phase_data.back().t_end_act, BLACK);
-#endif
+            IOtraceMPI::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
+                                                                    {
+                IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+                    "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
+                iohf::Disp(async_read_queue_req, async_read_queue_req.size(), std::string(caller) + " > rank " + std::to_string(rank) + " >> async_read_queue_req ", 1); });
+            IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+                "%s > rank %i %s>> read async requests ended at %f %s\n", caller, rank, RED, p_ar->phase_data.back().t_end_act, BLACK);
         }
     }
 
-#if IOTRACE_VERBOSE >= 4
-    if (read_status == 0)
-        printf("%s > rank %i %s>>>> testing for async read completion %s\n", caller, rank, RED, BLACK);
-#endif
+    IOtraceMPI::LogWithCondition<VerbosityLevel::DEBUG_LOG>(read_status == 0,
+                                                            "%s > rank %i %s>>>> testing for async read completion %s\n", caller, rank, RED, BLACK);
 
     Overhead_End();
 }
@@ -207,9 +199,8 @@ void IOtraceMPI::Read_Async_Required(MPI_Request *request)
     {
         p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0);
 
-#if IOTRACE_VERBOSE >= 2
-        printf("%s > rank %i %s>> active read async requests %li%s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
-#endif
+        IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+            "%s > rank %i %s>> active read async requests %li%s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
     }
     Overhead_End();
 }
@@ -240,15 +231,14 @@ void IOtraceMPI::Write_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset o
     p_sw->Phase_Start(true, t_sync_write_start, size_sync_write, offset);
 #endif
 
-#if IOTRACE_VERBOSE >= 1
-    printf("%s > rank %i > will write %i x %i bytes \n", caller, rank, count, data_size_write);
-#endif
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> started sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_start, BLACK);
-#endif
-#if IOTRACE_VERBOSE >= 3
-    printf("%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-#endif
+    // Logging
+    IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > will write %i x %i bytes \n", caller, rank, count, data_size_write);
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started sync write @ %.2f s %s\n", caller, rank, GREEN, t_sync_write_start, BLACK);
+    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
+
     Overhead_End();
 }
 
@@ -263,11 +253,11 @@ void IOtraceMPI::Write_Sync_End(void)
     t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
     p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
+
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> ended   sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_end, BLACK);
-#endif
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> ended   sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_end, BLACK);
 #endif
 
     Overhead_End();
@@ -298,15 +288,13 @@ void IOtraceMPI::Read_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset of
     p_sr->Phase_Start(true, t_sync_read_start, size_sync_read, offset);
 #endif
 
-#if IOTRACE_VERBOSE >= 1
-    printf("%s > rank %i > will read %i x %i bytes \n", caller, rank, count, data_size_read);
-#endif
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> started sync read @ %.2f s %s\n", caller, rank, GREEN, t_sync_read_start, BLACK);
-#endif
-#if IOTRACE_VERBOSE >= 3
-    printf("%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-#endif
+    // Logging
+    IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > will read %i x %i bytes \n", caller, rank, count, data_size_read);
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started sync read @ %.2f s %s\n", caller, rank, GREEN, t_sync_read_start, BLACK);
+    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
 
     Overhead_End();
 }
@@ -325,9 +313,8 @@ void IOtraceMPI::Read_Sync_End(void)
 
 #if SYNC_MODE == 0
     p_sr->Phase_End_Sync(t_sync_read_end);
-#if IOTRACE_VERBOSE >= 2
-    printf("%s > rank %i %s>> ended   sync read @ %f s %s\n", caller, rank, GREEN, t_sync_read_end, BLACK);
-#endif
+    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> ended   sync read @ %f s %s\n", caller, rank, GREEN, t_sync_read_end, BLACK);
 #endif
 
     Overhead_End();

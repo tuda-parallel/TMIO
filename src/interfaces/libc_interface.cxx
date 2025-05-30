@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #if ENABLE_LIBC_TRACE == 1
-IOtrace libc_iotrace;
+IOtraceLibc libc_iotrace;
 
 TMIO_FORWARD_DECL(open, int, (const char *path, int flags, ...));
 // See：https://github.com/darshan-hpc/darshan/issues/253 for `__open_2`
@@ -13,12 +13,13 @@ TMIO_FORWARD_DECL(__open_2, int, (const char *path, int oflag));
 TMIO_FORWARD_DECL(open64, int, (const char *path, int flags, ...));
 TMIO_FORWARD_DECL(openat, int, (int dirfd, const char *pathname, int flags, ...));
 TMIO_FORWARD_DECL(openat64, int, (int dirfd, const char *pathname, int flags, ...));
-TMIO_FORWARD_DECL(creat, int, (const char* path, mode_t mode));
-TMIO_FORWARD_DECL(creat64, int, (const char* path, mode_t mode));
-TMIO_FORWARD_DECL(read, ssize_t, (int fd, void *buf, size_t count));
+// TMIO_FORWARD_DECL(creat, int, (const char* path, mode_t mode));
+// TMIO_FORWARD_DECL(creat64, int, (const char* path, mode_t mode));
 TMIO_FORWARD_DECL(close, int, (int fd));
 
-// //! ----------------------- Open and Close ------------------------------
+TMIO_FORWARD_DECL(read, ssize_t, (int fd, void *buf, size_t count));
+
+// //! ----------------------- Open, Close, and Create ------------------------------
 
 int TMIO_DECL(open)(const char *path, int flags, ...)
 {
@@ -153,10 +154,12 @@ int TMIO_DECL(close)(int fd) {
 	return(ret);
 }
 
+//! ----------------------- Async Write ------------------------------
 
-// //**********************************************************************
-// //*							 . read
-// //**********************************************************************
+//! ----------------------- Async Read ------------------------------
+
+//! ----------------------- Sync Read ------------------------------
+
 ssize_t TMIO_DECL(read)(int fd, void *buf, size_t count) {
 	Function_Debug(__PRETTY_FUNCTION__);
 	ssize_t ret;
@@ -164,13 +167,15 @@ ssize_t TMIO_DECL(read)(int fd, void *buf, size_t count) {
 
 	MAP_OR_FAIL(read);
 
-	// if((unsigned long)buf % darshan_mem_alignment == 0) aligned_flag = 1;
-
+	libc_iotrace.Read_Sync_Start(count, aligned_flag);
 	ret = __real_read(fd, buf, count);
-
-	// std::cout << "TMIO > read(" << fd << ", " << buf << ", " << count << ")" << std::endl;
+	libc_iotrace.Read_Sync_End();
 
 	return(ret);
 }
+
+//! ----------------------- Wait and Test ------------------------------
+
+
 
 #endif // ENABLE_LIBC_TRACE

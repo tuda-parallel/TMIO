@@ -36,7 +36,7 @@ struct IOtraceTraits<MPI_Tag>
 {
 	using RequestType = MPI_Request;
 
-	static constexpr const char* Name = "MPI";
+	static constexpr const char *Name = "MPI";
 };
 
 struct Libc_Tag
@@ -47,7 +47,7 @@ struct IOtraceTraits<Libc_Tag>
 {
 	using RequestType = struct aiocb;
 
-	static constexpr const char* Name = "Libc";
+	static constexpr const char *Name = "Libc";
 };
 
 template <typename Tag>
@@ -57,7 +57,7 @@ public:
 	using RequestType = typename IOtraceTraits<Tag>::RequestType;
 	using RequestPtr = RequestType *;
 
-	static constexpr const char* kLibName = IOtraceTraits<Tag>::Name;
+	static constexpr const char *kLibName = IOtraceTraits<Tag>::Name;
 
 	IOtraceBase();
 	void Init(void);
@@ -155,6 +155,46 @@ protected:
 	//* Monitore ellapsed time
 	//*************************************
 	void Time_Info(std::string);
+
+	//*************************************
+	//* Debug
+	//*************************************
+	template <VerbosityLevel Level>
+	inline void Log(const char *format, ...)
+	{
+		if constexpr (static_cast<int>(IOTRACE_VERBOSITY) >= static_cast<int>(Level))
+		{
+			va_list args;
+			va_start(args, format);
+			vprintf(format, args);
+			va_end(args);
+		}
+	}
+
+	template <VerbosityLevel Level, typename Callable>
+	inline void LogWithSideEffects(Callable &&sideEffect, const char *format, ...)
+	{
+		if constexpr (static_cast<int>(IOTRACE_VERBOSITY) >= static_cast<int>(Level))
+		{
+			sideEffect();
+			Log<Level>(format);
+		}
+	}
+
+	template <VerbosityLevel Level>
+	inline void LogWithCondition(bool condition, const char *format, ...)
+	{
+		if constexpr (static_cast<int>(IOTRACE_VERBOSITY) >= static_cast<int>(Level))
+			if (condition)
+				Log<Level>(format);
+	}
+
+	template <VerbosityLevel Level, typename Callable>
+	inline void LogWithAction(Callable &&action)
+	{
+		if constexpr (static_cast<int>(IOTRACE_VERBOSITY) >= static_cast<int>(Level))
+			action();
+	}
 };
 
 /**
@@ -203,19 +243,23 @@ public:
 	void Read_Async_End(MPI_Request *request, int read_status = 1);
 	void Read_Async_Required(MPI_Request *);
 	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
-	void Read_Sync_End();
+	void Read_Sync_End(void);
 };
 
 class IOtraceLibc : public IOtraceBase<Libc_Tag>
 {
+public:
 	//*************************************
-	//* TODO: Write tracing
+	//* TODO: Libc Write tracing
 	//*************************************
+	void Write_Sync_Start(size_t count, off_t offset = 0);
+	void Write_Sync_End(void);
 
 	//*************************************
-	//* TODO: Read tracing
+	//* TODO: Libc Read tracing
 	//*************************************
-
+	void Read_Sync_Start(size_t count, off_t offset = 0);
+	void Read_Sync_End(void);
 };
 
 #endif // IOTRACE_H
