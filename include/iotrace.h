@@ -108,13 +108,15 @@ private:
 	std::vector<long long> async_write_size;
 	std::vector<int> async_write_queue_req;
 	std::vector<int> async_write_queue_act;
-	std::vector<MPI_Request *> async_write_request;
+	std::vector<AsyncRequest> async_write_requests;
+
 
 	std::vector<double> async_read_time;
 	std::vector<long long> async_read_size;
 	std::vector<int> async_read_queue_req;
 	std::vector<int> async_read_queue_act;
-	std::vector<MPI_Request *> async_read_request;
+	std::vector<AsyncRequest> async_read_requests;
+
 
 	IOdata aw, ar, sw, sr;
 	IOdata *p_aw = &aw;
@@ -148,3 +150,4 @@ private:
 	//*************************************
 	void Time_Info(std::string);
 };
+

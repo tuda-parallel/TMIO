@@ -306,6 +306,9 @@ int MPI_File_read_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatyp
 int MPI_Wait(MPI_Request *request, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
+	// static int counter = 0;
+	// counter++;
+	// std::cout << "Wait called " << counter << " Tag: " << status->MPI_TAG << " Source " << status->MPI << std::endl;
 	iotrace.Write_Async_Required(request);
 	iotrace.Read_Async_Required(request);
 	int result = PMPI_Wait(request, status);
@@ -316,6 +319,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status)
 	#elif defined CUSTOM_MPI
 		iotrace.Replace_Test();
 	#endif 
+	
 	return result;
 }
 

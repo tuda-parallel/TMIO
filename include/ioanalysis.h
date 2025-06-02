@@ -23,3 +23,18 @@ namespace ioanalysis
 	int *Get_N_From_ALL_N(IOdata *, n_struct *, int, int);
 
 }
+
+
+
+	
+class AsyncRequest{
+	
+public:
+	AsyncRequest(MPI_Request* orig);
+	bool check_request(MPI_Request *request);
+
+private:
+    // MPI_Request handle;     
+    MPI_Request* ptr;  
+
+};

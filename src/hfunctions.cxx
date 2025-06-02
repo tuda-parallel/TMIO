@@ -292,19 +292,35 @@ namespace iohf
 		}
 	}
 	template <class T>
-	void Gather_Summary(int n, int processes, int rank, T *buff_all_values, std::vector<T> bandwidth, int *arr_all_n, MPI_Comm IO_WORLD, MPI_Datatype type)
+	void Gather_Summary(int n, int processes, int rank, T *buff_all_values, std::vector<T> my_vector, int *arr_all_n, MPI_Comm IO_WORLD, MPI_Datatype type)
 	{
 
 		// buffer to store all values
 		int displacment[processes];
 
-		// MPI_Gather works only if all processes perform same number of write opertaions. --> Use gatherv
 		if (rank == 0)
 		{
-			for (int i = 0; i < processes; i++)
-				displacment[i] = (i > 0) ? displacment[i - 1] + arr_all_n[i - 1] : 0;
+			displacment[0] = 0;
+			for (int i = 1; i < processes; i++)
+			displacment[i] = displacment[i - 1] + arr_all_n[i - 1];
 		}
-		MPI_Gatherv(bandwidth.data(), n, type, buff_all_values, arr_all_n, displacment, type, 0, IO_WORLD);
+		
+		#if HDEBUG >= 1
+		if (rank == 0)
+		{
+		std::cout << "Rank " << rank << " calling MPI_Gatherv with n=" << n << std::endl;
+				std::cout << "arr_all_n: ";
+				for (int i = 0; i < processes; i++) std::cout << arr_all_n[i] << " ";
+				std::cout << "\ndisplacement: ";
+				for (int i = 0; i < processes; i++) std::cout << displacment[i] << " ";
+				std::cout << std::endl;
+			}
+		else{
+			std::cout << "Rank " << rank << " calling MPI_Gatherv with n=" << n << std::endl;
+		}
+		#endif
+
+		MPI_Gatherv(my_vector.data(), n, type, buff_all_values, arr_all_n, displacment, type, 0, IO_WORLD);
 	}
 	template void Gather_Summary<int>(int, int, int, int *, std::vector<int>, int *, MPI_Comm, MPI_Datatype);
 	template void Gather_Summary<long long>(int, int, int, long long *, std::vector<long long>, int *, MPI_Comm, MPI_Datatype);
@@ -470,7 +486,7 @@ namespace iohf
 #if HDEBUG >= 1
 				std::cout << "phase " << id_e[k_e] << " -> end" << std::endl;
 				std::cout << "queue: ";
-				for (int i = 0; i < queue.size(); i++)
+				for (unsigned int i = 0; i < queue.size(); i++)
 					std::cout << " " << queue[i] << " ";
 				std::cout << std::endl;
 #endif
@@ -489,7 +505,7 @@ namespace iohf
 #if HDEBUG >= 1
 				std::cout << "phase " << id_s[k_s] << " -> start" << std::endl;
 				std::cout << "queue: ";
-				for (int i = 0; i < queue.size(); i++)
+				for (unsigned int i = 0; i < queue.size(); i++)
 					std::cout << " " << queue[i] << " ";
 				std::cout << std::endl;
 #endif
@@ -677,8 +693,10 @@ namespace iohf
 
 	void Function_Debug(std::string s)
 	{
-#if FUNCTION_INFO == 1
+	#if FUNCTION_INFO == 1
 		std::cout << CYAN << "\t> executing " << s << BLACK << std::endl;
-#endif
+	#endif
 	}
+
+
 }

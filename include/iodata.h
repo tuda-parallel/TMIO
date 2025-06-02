@@ -69,7 +69,7 @@ public:
     template <class T>
     T Max(std::vector<T>);
     
-    //? calucalte the Bandwidth after the application finishes
+    //? calculate the Bandwidth after the application finishes
     void Bandwidth_In_Phase_Offline(void);
     
     //? Debug

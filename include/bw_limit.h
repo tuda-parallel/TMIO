@@ -25,10 +25,10 @@ private:
 	double scale_bw_iwrite; // scales the bandwidth limit of async write operations
 	double scale_bw_iread;	// scales the bandwidth limit of async read operations
 
-	dc_context_t context_read;	 // strucutre used by the bandwidth limitation approach in the custom mpich
-	dc_context_t context_write;	 // strucutre used by the bandwidth limitation approach in the custom mpich
-	dc_context_t context_iread;	 // strucutre used by the bandwidth limitation approach in the custom mpich
-	dc_context_t context_iwrite; // strucutre used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_read;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_write;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_iread;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_iwrite; // structure used by the bandwidth limitation approach in the custom mpich
 
 	int first_time_read;   // used to indicate the first time assignment of the bandwidth for sync write operations
 	int first_time_write;  // used to indicate the first time assignment of the bandwidth for sync read operations
