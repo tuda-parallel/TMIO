@@ -34,7 +34,7 @@ public:
 	bool check_request(MPI_Request *request);
 
 private:
-    // MPI_Request handle;     
+    MPI_Request handle;     
     MPI_Request* ptr;  
 
 };

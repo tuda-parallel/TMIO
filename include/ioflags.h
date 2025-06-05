@@ -14,7 +14,7 @@
 #endif
 
 #ifndef IOTRACE_VERBOSE
-#define IOTRACE_VERBOSE 3 //set debug level for iodata.cxx
+#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 #endif
 
 #ifndef IOANALYSIS_VERBOSE

@@ -207,7 +207,9 @@ void IOtrace::Summary(void)
 
     //? Overhead calculation
     //?-------------------------
+    //std::cout<< "Rank "<<rank <<  " stucked before overhead\n";
     double *time = Overhead_Calculation();
+    //std::cout<< "Rank "<<rank << " stucked after overhead\n";
 
     //? Print
     //?-------------------------
@@ -344,7 +346,8 @@ void IOtrace::Write_Async_End(MPI_Request *request, int write_status)
             p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
 
 #if IOTRACE_VERBOSE >= 2
-            printf("%s > rank %i %s>> Async ended. Remaining async requests %li %s\n", caller, rank, GREEN, async_write_requests.size(), BLACK);
+            static long int counter = 1;
+            printf("%s > rank %i %s>> Async ended (act ended). Active async write requests %li/%li %s\n", caller, rank, GREEN, async_write_requests.size(),counter++, BLACK);
             // iohf::Disp(async_write_queue_act, async_write_queue_act.size(), std::string(caller) + " > rank " + std::to_string(rank) + " >> async_write_queue_act ", 1);
 #endif
 #if IOTRACE_VERBOSE >= 3
@@ -379,7 +382,7 @@ void IOtrace::Write_Async_Required(MPI_Request *request)
 
 #if IOTRACE_VERBOSE >= 2
 	static long int counter = 1;
-	printf("%s > rank %i %s>> Wait reached. Active async write requests %li/%li %s\n", caller, rank, GREEN, async_write_requests.size(),counter++, BLACK);
+	printf("%s > rank %i %s>> Wait reached (Req ended). Active async write requests %li/%li %s\n", caller, rank, GREEN, async_write_requests.size(),counter++, BLACK);
 #endif
     }
     Overhead_End();
@@ -677,6 +680,8 @@ bool IOtrace::
         for (unsigned int i = 0; i < async_write_requests.size(); i++)
         {
 			// std ::cout << "check says: " <<(iohf::check_request(request, async_write_requests[i])) << std::endl;
+            //std ::cout << "Mode " << mode << " Open request: " << async_write_requests.size() << std::endl;
+            //if (async_write_requests[i].check_request(request) || (*request == MPI_REQUEST_NULL && async_write_requests.size() == 1))
             if (async_write_requests[i].check_request(request))
             {
                 if (mode == 1){
@@ -732,6 +737,7 @@ bool IOtrace::Check_Request_Read(MPI_Request *request, double *start_time, long 
     {
         for (unsigned int i = 0; i < async_read_requests.size(); i++)
         {
+            //if (async_read_requests[i].check_request(request) || (*request == MPI_REQUEST_NULL && async_read_requests.size() == 1))
             if (async_read_requests[i].check_request(request))
             {
                 if (mode == 1){
@@ -898,7 +904,7 @@ double *IOtrace::Overhead_Calculation(void)
 }
 
 void IOtrace::Time_Info(std::string s){
-#ifdef IOTRACE_VERBOSE 
+#if IOTRACE_VERBOSE > 2
     if (rank == 0){
         // static double t_passed = MPI_Wtime() - t_0;
         static double t_passed = MPI_Wtime() - t_summary;

@@ -335,11 +335,10 @@ void ioanalysis::Sum_N(n_struct *all_n, n_struct &n_phase, int rank, int process
 
 AsyncRequest::AsyncRequest(MPI_Request* orig){
 	ptr = orig;  
-	// handle = *orig;     
+	handle = *orig;     
 } 
 
 bool AsyncRequest::check_request(MPI_Request *request) {
 	// TODO: find a better way to compare these, as request can change from outside
-    return (request != nullptr) && (ptr == request);
-	//  || handle == *request);
+    return ((request != nullptr) && (ptr == request))  || (handle == *request);
 }
