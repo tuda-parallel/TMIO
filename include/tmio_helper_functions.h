@@ -7,6 +7,7 @@
 #include <cstdint> // For uint64_t
 #include <iostream>
 #include <string>
+#include <vector>
 
 /**
  * @brief The TMIO_FORWARD_DECL macro is used to provide forward
@@ -45,6 +46,12 @@ void Function_Debug(std::string function_name, int flag = 0);
 
 void iotrace_init_helper();
 void iotrace_finalize_helper();
+
+namespace functiontracing
+{
+    void Function_Debug(const std::string &function_name);
+    std::vector<std::string> Function_Debug_finalize();
+}
 
 // std::atomic<uint64_t> request_id_counter(0);
 // uint64_t generate_unique_id()

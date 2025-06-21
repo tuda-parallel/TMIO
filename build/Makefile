@@ -22,7 +22,7 @@
 SHELL      := /bin/bash
 VERSION    := 1.0.0
 
-PROCS         := 2  #set number of proccesses (2 --> 8)
+PROCS         := 8  #set number of proccesses (2 --> 8)
 OPENMPTHREADS := 4
 
 MPICXX = mpicxx

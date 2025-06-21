@@ -36,6 +36,7 @@ enum class VerbosityLevel {
     DEBUG_LOG = 3,  // Debug-level information
     TRACE_LOG = 4   // Very verbose, trace-level information
 };
+
 constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
 
@@ -120,7 +121,9 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 0 // shows which function is called
+#define FUNCTION_INFO 2
+// 1: Directly print the function tracing to stdout
+// 2: Enhanced function tracing
 #endif
 
 #ifndef OVERHEAD
@@ -225,6 +228,14 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 
 //colors output: 
 #define COLOR_OUTPUT 
+
+
+// * Batch IO Settings
+#ifndef BATCH_LIO
+#define BATCH_LIO 0
+// 0: Track each sync IO operation separately
+// 1: Batch all IO operations when call `lio_listio` with `LIO_WAIT` model
+#endif
 
 
 
