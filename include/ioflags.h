@@ -232,7 +232,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 
 // * Batch IO Settings
 #ifndef BATCH_LIO
-#define BATCH_LIO 0
+#define BATCH_LIO 1
 // 0: Track each sync IO operation separately
 // 1: Batch all IO operations when call `lio_listio` with `LIO_WAIT` model
 #endif

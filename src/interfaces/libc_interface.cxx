@@ -389,7 +389,7 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 
 	if (mode == LIO_WAIT) // Sync
 	{
-#if BATCH_LIO == 0
+#if BATCH_LIO == 1
 		// Merge all aiocb into one overarching request, but only for tracing
 		int batch_read_iovcnt = 0;
 		int batch_write_iovcnt = 0;
@@ -419,9 +419,9 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					libc_iotrace.Batch_Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					libc_iotrace.Batch_Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else
 					continue; // LIO_NOP
 			}
@@ -435,7 +435,7 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 			std::cerr << "TMIO > lio_listio(LIO_WAIT) failed or interrupted: " << strerror(errno) << " (errno=" << errno << "). TMIO tracing result might be inaccurate. Better to call the lio_list again" << std::endl;
 
 // End the sync tracing
-#if BATCH_LIO == 0
+#if BATCH_LIO == 1
 		if (batch_read_iovcnt > 0)
 			libc_iotrace.Read_Sync_End();
 		if (batch_write_iovcnt > 0)
@@ -446,9 +446,9 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Read_Sync_End();
+					libc_iotrace.Batch_Read_Sync_End();
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Write_Sync_End();
+					libc_iotrace.Batch_Write_Sync_End();
 				else
 					continue; // LIO_NOP
 			}
@@ -488,7 +488,7 @@ int TMIO_DECL(lio_listio64)(int mode, struct aiocb64 *const aiocb_list[], int ni
 
 	if (mode == LIO_WAIT) // Sync
 	{
-#if BATCH_LIO == 0
+#if BATCH_LIO == 1
 		// Merge all aiocb into one overarching request, but only for tracing
 		int batch_read_iovcnt = 0;
 		int batch_write_iovcnt = 0;
@@ -534,7 +534,7 @@ int TMIO_DECL(lio_listio64)(int mode, struct aiocb64 *const aiocb_list[], int ni
 			std::cerr << "TMIO > lio_listio(LIO_WAIT) failed or interrupted: " << strerror(errno) << " (errno=" << errno << "). TMIO tracing result might be inaccurate. Better to call the lio_list again" << std::endl;
 
 // End the sync tracing
-#if BATCH_LIO == 0
+#if BATCH_LIO == 1
 		if (batch_read_iovcnt > 0)
 			libc_iotrace.Read_Sync_End();
 		if (batch_write_iovcnt > 0)

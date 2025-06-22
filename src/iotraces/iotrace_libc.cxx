@@ -37,7 +37,8 @@ void IOtraceLibc::Write_Async_Start(const struct aiocb *aiocbp)
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, aiocbp->aio_offset, BLACK);
 }
 
-void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp) {
+void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp)
+{
     async_write_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine write size from aiocb structure
@@ -63,7 +64,7 @@ void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp) {
         "%s > rank %i %s>> started async write @ %f s %s\n", caller, rank, GREEN, async_write_time.back(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, aiocbp->aio_offset, BLACK);
-    
+
     Overhead_End();
 }
 
@@ -167,7 +168,8 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb *aiocbp)
     Overhead_End();
 }
 
-void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp) {
+void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp)
+{
     async_read_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine read size from aiocb structure
@@ -193,7 +195,7 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp) {
         "%s > rank %i %s>> started async read @ %f s %s\n", caller, rank, GREEN, async_read_time.back(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, aiocbp->aio_offset, BLACK);
-    
+
     Overhead_End();
 }
 
@@ -231,10 +233,12 @@ void IOtraceLibc::Read_Async_End(const struct aiocb *aiocbp, int read_status)
         "%s > rank %i %s>>>> testing for async read completion %s\n", caller, rank, RED, BLACK);
     Overhead_End();
 }
+
 void IOtraceLibc::Read_Async_End(const struct aiocb64 *aiocbp, int read_status)
 {
     Read_Async_End(reinterpret_cast<const struct aiocb *>(aiocbp), read_status); // Cast aiocb64 to aiocb
 }
+
 /**
  * @brief This function complements the functionality of @ref IOtraceMPI::Read_Async_Required.
  *        But would read the aiocb structure to get the I/O operation details.
@@ -294,6 +298,37 @@ void IOtraceLibc::Write_Sync_Start(size_t count, off64_t offset)
 }
 
 /**
+ * @brief What "batch" means is not the IO operation per se is executed in one shot, but that multiple
+ *       write operations are grouped together and executed in a single batch **one by one**.
+ *       So this function would be call multiple times to trace a batch of write operations.
+ *
+ * @param count    [in] *bytes* count of write operations
+ * @param offset   [in,optional] offset of the I/O operation, default is 0
+ *
+ * @see IOtraceMPI::Batch_Write_Sync_Start
+ */
+void IOtraceLibc::Batch_Write_Sync_Start(size_t count, off64_t offset)
+{
+    
+    t_sync_write_start = Overhead_Start(MPI_Wtime() - t_0);
+    size_sync_write = count * 1; // in B
+
+    // Phase start if first request. Add phase data and offset
+    p_sw->Phase_Start(!batch_writing, t_sync_write_start, size_sync_write, offset);
+
+    batch_writing = true;
+
+    // Logging
+    IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > will write %zu bytes \n", caller, rank, count);
+    IOtraceLibc::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started sync write @ %.2f s %s\n", caller, rank, GREEN, t_sync_write_start, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
+    Overhead_End();
+}
+
+/**
  * @brief This function complements the functionality of @ref IOtraceMPI::Write_Sync_End.
  *
  * @see IOtraceMPI::Write_Sync_End
@@ -310,6 +345,55 @@ void IOtraceLibc::Write_Sync_End(void)
 #endif
 
     Overhead_End();
+
+    IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > Sync write ended successfully.\n", caller, rank);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sw->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> sync writing ended at %f %s\n", caller, rank, RED, p_sw->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> sync writing size %lli %s\n", caller, rank, YELLOW, size_sync_write, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> sync writing start time %f %s\n", caller, rank, YELLOW, t_sync_write_start, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> sync writing end time %f %s\n", caller, rank, YELLOW, t_sync_write_end, BLACK);
+}
+
+void IOtraceLibc::Batch_Write_Sync_End()
+{
+    t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
+
+    if (!batch_writing)
+    {
+        IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+            "%s > rank %i > No batch writing in progress, cannot end sync write.\n", caller, rank);
+        return;
+    }
+
+    p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
+
+#if SYNC_MODE == 0
+    p_sw->Phase_End_Sync(t_sync_write_end);
+    IOtraceLibc::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> ended   sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_end, BLACK);
+#endif
+
+    batch_writing = false;
+    Overhead_End();
+
+    IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > Batch sync write ended successfully.\n", caller, rank);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sw->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch writing ended at %f %s\n", caller, rank, RED, p_sw->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch writing size %lli %s\n", caller, rank, YELLOW, size_sync_write, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch writing start time %f %s\n", caller, rank, YELLOW, t_sync_write_start, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch writing end time %f %s\n", caller, rank, YELLOW, t_sync_write_end, BLACK);
 }
 //! ------------------------------ Sync read tracing -------------------------------
 /**
@@ -343,6 +427,37 @@ void IOtraceLibc::Read_Sync_Start(size_t count, off64_t offset)
 }
 
 /**
+ * @brief What "batch" means is not the IO operation per se is executed in one shot, but that multiple
+ *        read operations are grouped together and executed in a single batch **one by one**.
+ *        So this function would be call multiple times to trace a batch of read operations.
+ *
+ * @param count    [in] *bytes* count of read operations
+ * @param offset   [in,optional] offset of the I/O operation, default is 0
+ *
+ * @see IOtraceMPI::Batch_Read_Sync_Start
+ */
+void IOtraceLibc::Batch_Read_Sync_Start(size_t count, off64_t offset)
+{
+    
+    t_sync_read_start = Overhead_Start(MPI_Wtime() - t_0);
+    size_sync_read = count * 1; // in B
+
+    // Phase start if first request. Add phase data and offset
+    p_sr->Phase_Start(!batch_reading, t_sync_read_start, size_sync_read, offset);
+
+    batch_reading = true;
+    // Logging
+    IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > will read %zu bytes \n", caller, rank, count);
+    IOtraceLibc::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> started sync read @ %.2f s %s\n", caller, rank, GREEN, t_sync_read_start, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
+
+    Overhead_End();
+}
+
+/**
  * @see IOtraceMPI::Read_Sync_End
  */
 void IOtraceLibc::Read_Sync_End(void)
@@ -358,4 +473,40 @@ void IOtraceLibc::Read_Sync_End(void)
 #endif
 
     Overhead_End();
+}
+
+void IOtraceLibc::Batch_Read_Sync_End()
+{
+    t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
+
+    if (!batch_reading)
+    {
+        IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+            "%s > rank %i > No batch reading in progress, cannot end sync read.\n", caller, rank);
+        return;
+    }
+
+    p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
+
+#if SYNC_MODE == 0
+    p_sr->Phase_End_Sync(t_sync_read_end);
+    IOtraceLibc::Log<VerbosityLevel::DETAILED_LOG>(
+        "%s > rank %i %s>> ended   sync read @ %f s %s\n", caller, rank, GREEN, t_sync_read_end, BLACK);
+#endif
+
+    batch_reading = false;
+    Overhead_End();
+
+    IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i > Batch sync read ended successfully.\n", caller, rank);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sr->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch reading ended at %f %s\n", caller, rank, RED, p_sr->phase_data.back().t_end_act, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch reading size %lli %s\n", caller, rank, YELLOW, size_sync_read, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch reading start time %f %s\n", caller, rank, YELLOW, t_sync_read_start, BLACK);
+    IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
+        "%s > rank %i %s>>> batch reading end time %f %s\n", caller, rank, YELLOW, t_sync_read_end, BLACK);
 }
