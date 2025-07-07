@@ -4,6 +4,143 @@
 #include "ioflags.h"
 #include <sstream>
 #include <iostream>
+#include <mutex>
+
+
+namespace functiontracing
+{
+    /**
+     * @class FunctionTracer
+     * @brief A thread-safe class to trace and aggregate function call information.
+     *
+     * This class encapsulates the buffer, counters, and the mutex required to
+     * safely record function calls from multiple threads (e.g., main thread and
+     * MPI progress threads).
+     */
+    class FunctionTracer
+    {
+    public:
+        // Deleted copy and move constructors to prevent accidental copies of the singleton.
+        FunctionTracer(const FunctionTracer &) = delete;
+        FunctionTracer &operator=(const FunctionTracer &) = delete;
+
+        /**
+         * @brief Records a function call. Aggregates consecutive identical calls.
+         * @param function_name The name of the function that was called.
+         */
+        void add_trace(const std::string &function_name)
+        {
+            // Lock the mutex for the duration of this function call.
+            // The lock is automatically released when 'lock' goes out of scope.
+            std::lock_guard<std::mutex> lock(mtx_);
+
+            if (current_function_name_ == function_name)
+            {
+                test_counter_++;
+                return; // Increment counter for consecutive calls and exit.
+            }
+
+            // If the function name changed, process the previous function's data.
+            flush_current_trace_to_stream();
+            current_function_name_ = function_name;
+        }
+
+        /**
+         * @brief Gathers trace data from all MPI ranks and returns it for printing.
+         * @return A vector of strings containing the formatted trace for all ranks.
+         */
+        std::vector<std::string> finalize()
+        {
+            // Lock to ensure no other thread is modifying data during finalization.
+            std::lock_guard<std::mutex> lock(mtx_);
+
+            // Process the very last function that was being traced.
+            flush_current_trace_to_stream();
+            current_function_name_ = "finalize"; // Mark as finalized.
+            flush_current_trace_to_stream();
+
+            // The rest of the MPI communication logic remains the same.
+            int rank = 0;
+            int size = 0;
+            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            if (size < 1) { return {}; }
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+            std::string function_trace_str = oss_.str();
+            oss_.str(""); // Clear the stream buffer.
+
+            size_t my_tracing_size = function_trace_str.size();
+            std::vector<size_t> tracing_sizes(size, 0);
+            MPI_Gather(&my_tracing_size, 1, MPI_UNSIGNED_LONG, tracing_sizes.data(), 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+            std::vector<std::string> all_tracing;
+            if (rank == 0)
+            {
+                all_tracing.emplace_back("Function calling trace for all ranks:\n");
+                all_tracing.emplace_back("\n--- Rank " + std::to_string(0) + " Trace ---\n");
+                all_tracing.emplace_back(function_trace_str);
+                for (int i = 1; i < size; ++i)
+                {
+                    all_tracing.emplace_back("\n--- Rank " + std::to_string(i) + " Trace ---\n");
+                    std::vector<char> buffer(tracing_sizes[i]);
+                    MPI_Recv(buffer.data(), tracing_sizes[i], MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    all_tracing.emplace_back(buffer.data(), tracing_sizes[i]);
+                }
+                all_tracing.emplace_back("Total number of ranks: " + std::to_string(size) + "\n");
+            }
+            else
+            {
+                MPI_Send(function_trace_str.data(), my_tracing_size, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+            }
+            return all_tracing;
+        }
+
+    private:
+        // Private constructor for the singleton pattern.
+        FunctionTracer() = default;
+
+        // This is the helper that processes the buffered function name.
+        // It's private because it should only be called internally when the mutex is held.
+        void flush_current_trace_to_stream()
+        {
+            if (current_function_name_.empty())
+            {
+                return;
+            }
+
+            if (test_counter_ > 0)
+            {
+                oss_ << "\tTMIO  > " << BLUE << "\t> executed " << RED << test_counter_ + 1 << BLUE << " "
+                     << current_function_name_ << "\n"
+                     << BLACK;
+            }
+            else
+            {
+                oss_ << "\tTMIO  > " << BLUE << "\t> executing " << current_function_name_ << BLACK << std::endl;
+            }
+            test_counter_ = 0; // Reset counter
+        }
+
+        // The singleton accessor is a friend so it can call the private constructor.
+        friend FunctionTracer &get_tracer();
+
+        // Data members are now private and protected by the mutex.
+        mutable std::mutex mtx_; // `mutable` allows locking in const methods if needed.
+        std::string current_function_name_ = "";
+        size_t test_counter_ = 0;
+        std::ostringstream oss_;
+    };
+
+    /**
+     * @brief Provides access to the Mayer's singleton instance of FunctionTracer.
+     */
+    FunctionTracer &get_tracer()
+    {
+        static FunctionTracer instance;
+        return instance;
+    }
+
+} // namespace functiontracing
 
 void iotrace_init_helper()
 {
@@ -12,7 +149,7 @@ void iotrace_init_helper()
 #endif
 
 #if ENABLE_LIBC_TRACE == 1
-    libc_iotrace.Init();
+    get_libc_iotrace().Init();
 #endif
 }
 
@@ -27,12 +164,12 @@ void iotrace_finalize_helper()
 #endif
 
 #if ENABLE_LIBC_TRACE == 1
-    libc_iotrace.Set("finalize", true);
-    libc_iotrace.Summary();
+    get_libc_iotrace().Set("finalize", true);
+    get_libc_iotrace().Summary();
 #endif
 
 #if FUNCTION_INFO == 2
-    std::vector<std::string> all_tracing = functiontracing::Function_Debug_finalize();
+    std::vector<std::string> all_tracing = functiontracing::get_tracer().finalize();
     for (const auto &trace : all_tracing)
     {
         std::cout << trace;
@@ -70,114 +207,7 @@ void Function_Debug(std::string function_name, int test_flag)
         flag = true;
     }
 #elif FUNCTION_INFO == 2
-    functiontracing::Function_Debug(function_name);
+    // The public-facing function now calls the method on the singleton instance.
+    functiontracing::get_tracer().add_trace(function_name);
 #endif
 }
-
-namespace functiontracing
-{
-    struct passed_func_name_buffer
-    {
-        std::string function_name = "";
-        size_t test_counter = 0;
-        std::ostringstream oss;
-    };
-
-    struct passed_func_name_buffer function_trace_buffer;
-
-    // Helper function to handle function name and test counter logic
-    void HandleFunctionNameChange(const std::string &function_name)
-    {
-        if (!function_trace_buffer.function_name.empty())
-        {
-            if (function_trace_buffer.test_counter != 0)
-            {
-                function_trace_buffer.oss << "\tTMIO  > " << BLUE << "\t> executed " << RED << function_trace_buffer.test_counter << BLUE << " "
-                    << function_trace_buffer.function_name << "\n"
-                    << BLACK;
-                function_trace_buffer.test_counter = 0; // Reset counter for the next function
-            }
-            else
-            {
-                function_trace_buffer.oss << "\tTMIO  > " << BLUE << "\t> executing " << function_trace_buffer.function_name << BLACK << std::endl;
-            }
-        }
-        function_trace_buffer.function_name = function_name;
-    }
-
-    void Function_Debug(const std::string & function_name)
-    {
-        if (function_trace_buffer.function_name == function_name)
-        {
-            function_trace_buffer.test_counter++;
-            return; // Skip duplicate function calls
-        }
-
-        HandleFunctionNameChange(function_name);
-    }
-
-    std::vector<std::string> Function_Debug_finalize()
-    {
-        int rank = 0;
-        int size = 0;
-        MPI_Comm_size(MPI_COMM_WORLD, &size);
-        if (size < 1)
-        {
-            std::cerr << "Error: MPI_COMM_WORLD size is less than 1." << std::endl;
-            return {};
-        }
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-        // Finalize the current function name and test counter
-        HandleFunctionNameChange("finalize");
-
-        std::string function_trace_str;
-        function_trace_str += function_trace_buffer.oss.str();
-        function_trace_buffer.oss.str(""); 
-
-        size_t my_tracing_size = function_trace_str.size();
-        std::vector<size_t> tracing_sizes(size, 0);
-        int ret = MPI_Gather(&my_tracing_size, 1, MPI_UNSIGNED_LONG, tracing_sizes.data(), 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-
-        if (ret != MPI_SUCCESS)
-        {
-            std::cerr << "Error: MPI_Gather failed." << std::endl;
-            return {};
-        }
-
-        std::vector<std::string> all_tracing;
-        // Rank 0 print the sizes gathered
-        if (rank == 0)
-        {
-            all_tracing.emplace_back("Function calling trace for all ranks:\n");
-            all_tracing.emplace_back("\n--- Rank " + std::to_string(0) + " Trace ---\n");
-            all_tracing.emplace_back(function_trace_str);
-            for (int i = 1; i < size; ++i)
-            {
-                // Add spliter and rank information for clarity
-                all_tracing.emplace_back("\n--- Rank " + std::to_string(i) + " Trace ---\n");
-
-                std::vector<char> buffer(tracing_sizes[i]);
-                int ret = MPI_Recv(buffer.data(), tracing_sizes[i], MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                if (ret != MPI_SUCCESS)
-                {
-                    std::cerr << "Error: MPI_Recv failed for rank " << i << "." << std::endl;
-                    return {};
-                }
-                all_tracing.emplace_back(buffer.data(), tracing_sizes[i]);
-            }
-            all_tracing.emplace_back("Total number of ranks: " + std::to_string(size) + "\n");
-        }
-        else
-        {
-            // Non-root ranks send their tracing data
-            int ret = MPI_Send(function_trace_str.data(), my_tracing_size, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
-            if (ret != MPI_SUCCESS)
-            {
-                std::cerr << "Error: MPI_Send failed for rank " << rank << "." << std::endl;
-                return {};
-            }
-        }
-        return all_tracing;
-    }
-} // namespace functiontracing

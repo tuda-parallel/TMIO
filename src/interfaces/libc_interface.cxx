@@ -22,7 +22,16 @@
 #endif
 
 #if ENABLE_LIBC_TRACE == 1
-IOtraceLibc libc_iotrace;
+IOtraceLibc& get_libc_iotrace() {
+	// Must use static IOtraceLibc instance to ensure a single instance is initialized when first used.
+	// TODO: Might need to use a mutex to protect the instance creation if multiple threads might access it simultaneously.
+	// `thread_local` is for some MPI implementations that has a separate MPI progress thread, 
+	// which differs from the main thread, and both the main thread and the MPI progress thread
+	// might access the IOtraceLibc instance simultaneously.  So we use thread_local to ensure
+	// that each thread has its own instance of IOtraceLibc.
+    static thread_local IOtraceLibc instance;
+    return instance;
+}
 
 TMIO_FORWARD_DECL(open, int, (const char *path, int flags, ...));
 // See：https://github.com/darshan-hpc/darshan/issues/253 for `__open_2`
@@ -95,7 +104,7 @@ int TMIO_DECL(open)(const char *path, int flags, ...)
 		ret = __real_open(path, flags);
 	}
 
-	libc_iotrace.Open();
+	get_libc_iotrace().Open();
 	return (ret);
 }
 
@@ -108,7 +117,7 @@ int TMIO_DECL(__open_2)(const char *path, int oflag)
 
 	ret = __real_open(path, oflag);
 
-	libc_iotrace.Open();
+	get_libc_iotrace().Open();
 
 	return (ret);
 }
@@ -135,7 +144,7 @@ int TMIO_DECL(open64)(const char *path, int flags, ...)
 		ret = __real_open64(path, flags);
 	}
 
-	libc_iotrace.Open();
+	get_libc_iotrace().Open();
 	return (ret);
 }
 
@@ -161,7 +170,7 @@ int TMIO_DECL(openat)(int dirfd, const char *pathname, int flags, ...)
 		ret = __real_openat(dirfd, pathname, flags);
 	}
 
-	libc_iotrace.Open();
+	get_libc_iotrace().Open();
 	return (ret);
 }
 
@@ -187,7 +196,7 @@ int TMIO_DECL(openat64)(int dirfd, const char *pathname, int flags, ...)
 		ret = __real_openat64(dirfd, pathname, flags);
 	}
 
-	libc_iotrace.Open();
+	get_libc_iotrace().Open();
 	return (ret);
 }
 
@@ -200,7 +209,7 @@ int TMIO_DECL(close)(int fd)
 
 	ret = __real_close(fd);
 
-	libc_iotrace.Close();
+	get_libc_iotrace().Close();
 
 	// std::cout << "TMIO > close(" << fd << ")" << std::endl;
 
@@ -215,7 +224,7 @@ int TMIO_DECL(aio_write)(struct aiocb *aiocbp)
 
 	MAP_OR_FAIL(aio_write);
 
-	libc_iotrace.Write_Async_Start(aiocbp);
+	get_libc_iotrace().Write_Async_Start(aiocbp);
 	ret = __real_aio_write(aiocbp);
 	return (ret);
 }
@@ -227,7 +236,7 @@ int TMIO_DECL(aio_write64)(struct aiocb64 *aiocbp)
 
 	MAP_OR_FAIL(aio_write64);
 
-	libc_iotrace.Write_Async_Start(aiocbp);
+	get_libc_iotrace().Write_Async_Start(aiocbp);
 	ret = __real_aio_write64(aiocbp);
 	return (ret);
 }
@@ -240,7 +249,7 @@ int TMIO_DECL(aio_read)(struct aiocb *aiocbp)
 
 	MAP_OR_FAIL(aio_read);
 
-	libc_iotrace.Read_Async_Start(aiocbp);
+	get_libc_iotrace().Read_Async_Start(aiocbp);
 	ret = __real_aio_read(aiocbp);
 	return (ret);
 }
@@ -252,7 +261,7 @@ int TMIO_DECL(aio_read64)(struct aiocb64 *aiocbp)
 
 	MAP_OR_FAIL(aio_read64);
 
-	libc_iotrace.Read_Async_Start(aiocbp);
+	get_libc_iotrace().Read_Async_Start(aiocbp);
 	ret = __real_aio_read64(aiocbp);
 	return (ret);
 }
@@ -279,20 +288,20 @@ int TMIO_DECL(aio_error)(const struct aiocb *aiocbp)
             break;
         case ECANCELED:
             // Request was canceled; trace and print error
-            libc_iotrace.Read_Async_End(aiocbp);
-            libc_iotrace.Write_Async_End(aiocbp);
+            get_libc_iotrace().Read_Async_End(aiocbp);
+            get_libc_iotrace().Write_Async_End(aiocbp);
             fprintf(stderr, "TMIO > aio_error with aio_fildes: %d was canceled (ECANCELED: %s)\n", aiocbp->aio_fildes, strerror(ECANCELED));
             break;
         case 0:
             // Request completed successfully; trace
-            libc_iotrace.Read_Async_End(aiocbp);
-            libc_iotrace.Write_Async_End(aiocbp);
+            get_libc_iotrace().Read_Async_End(aiocbp);
+            get_libc_iotrace().Write_Async_End(aiocbp);
             break;
         default:
             if (ret > 0) {
                 // A positive error number: operation failed; trace and print error
-                libc_iotrace.Read_Async_End(aiocbp);
-                libc_iotrace.Write_Async_End(aiocbp);
+                get_libc_iotrace().Read_Async_End(aiocbp);
+                get_libc_iotrace().Write_Async_End(aiocbp);
                 fprintf(stderr, "TMIO > aio_error with aio_fildes: %d failed with error code: %s\n", aiocbp->aio_fildes, strerror(ret));
             }
             break;
@@ -322,8 +331,8 @@ int TMIO_DECL(aio_suspend)(const struct aiocb *const aiocb_list[], int nitems, c
 	{
 		if (aiocb_list[i] != nullptr)
 		{
-			libc_iotrace.Read_Async_Required(aiocb_list[i]);
-			libc_iotrace.Write_Async_Required(aiocb_list[i]);
+			get_libc_iotrace().Read_Async_Required(aiocb_list[i]);
+			get_libc_iotrace().Write_Async_Required(aiocb_list[i]);
 		}
 	}
 	ret = __real_aio_suspend(aiocb_list, nitems, timeout);
@@ -362,12 +371,12 @@ ssize_t TMIO_DECL(aio_return)(struct aiocb *aiocbp)
 	if (ret != -1) // If success, trace
 	{
 		// Further confirm the completion of actual time
-		libc_iotrace.Read_Async_End(aiocbp);
-		libc_iotrace.Write_Async_End(aiocbp);
+		get_libc_iotrace().Read_Async_End(aiocbp);
+		get_libc_iotrace().Write_Async_End(aiocbp);
 
 		// Fallback for required time
-		libc_iotrace.Read_Async_Required(aiocbp);
-		libc_iotrace.Write_Async_Required(aiocbp);
+		get_libc_iotrace().Read_Async_Required(aiocbp);
+		get_libc_iotrace().Write_Async_Required(aiocbp);
 	}
 
 	return (ret);
@@ -409,19 +418,19 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 		}
 
 		if (batch_read_iovcnt > 0)
-			libc_iotrace.Read_Sync_Start(batch_read_iovcnt, OFFSET);
+			get_libc_iotrace().Read_Sync_Start(batch_read_iovcnt, OFFSET);
 
 		if (batch_write_iovcnt > 0)
-			libc_iotrace.Write_Sync_Start(batch_write_iovcnt, OFFSET);
+			get_libc_iotrace().Write_Sync_Start(batch_write_iovcnt, OFFSET);
 #else
 		for (int i = 0; i < nitems; ++i)
 		{
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Batch_Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					get_libc_iotrace().Batch_Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Batch_Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					get_libc_iotrace().Batch_Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else
 					continue; // LIO_NOP
 			}
@@ -437,18 +446,18 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 // End the sync tracing
 #if BATCH_LIO == 1
 		if (batch_read_iovcnt > 0)
-			libc_iotrace.Read_Sync_End();
+			get_libc_iotrace().Read_Sync_End();
 		if (batch_write_iovcnt > 0)
-			libc_iotrace.Write_Sync_End();
+			get_libc_iotrace().Write_Sync_End();
 #else
 		for (int i = 0; i < nitems; ++i)
 		{
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Batch_Read_Sync_End();
+					get_libc_iotrace().Batch_Read_Sync_End();
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Batch_Write_Sync_End();
+					get_libc_iotrace().Batch_Write_Sync_End();
 				else
 					continue; // LIO_NOP
 			}
@@ -461,8 +470,8 @@ int TMIO_DECL(lio_listio)(int mode, struct aiocb *const aiocb_list[], int nitems
 		{
 			if (aiocb_list[i] != nullptr)
 			{
-				libc_iotrace.Read_Async_Start(aiocb_list[i]);
-				libc_iotrace.Write_Async_Start(aiocb_list[i]);
+				get_libc_iotrace().Read_Async_Start(aiocb_list[i]);
+				get_libc_iotrace().Write_Async_Start(aiocb_list[i]);
 			}
 		}
 
@@ -508,19 +517,19 @@ int TMIO_DECL(lio_listio64)(int mode, struct aiocb64 *const aiocb_list[], int ni
 		}
 
 		if (batch_read_iovcnt > 0)
-			libc_iotrace.Read_Sync_Start(batch_read_iovcnt, OFFSET);
+			get_libc_iotrace().Read_Sync_Start(batch_read_iovcnt, OFFSET);
 
 		if (batch_write_iovcnt > 0)
-			libc_iotrace.Write_Sync_Start(batch_write_iovcnt, OFFSET);
+			get_libc_iotrace().Write_Sync_Start(batch_write_iovcnt, OFFSET);
 #else
 		for (int i = 0; i < nitems; ++i)
 		{
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					get_libc_iotrace().Read_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
+					get_libc_iotrace().Write_Sync_Start(aiocb_list[i]->aio_nbytes, aiocb_list[i]->aio_offset);
 				else
 					continue; // LIO_NOP
 			}
@@ -536,18 +545,18 @@ int TMIO_DECL(lio_listio64)(int mode, struct aiocb64 *const aiocb_list[], int ni
 // End the sync tracing
 #if BATCH_LIO == 1
 		if (batch_read_iovcnt > 0)
-			libc_iotrace.Read_Sync_End();
+			get_libc_iotrace().Read_Sync_End();
 		if (batch_write_iovcnt > 0)
-			libc_iotrace.Write_Sync_End();
+			get_libc_iotrace().Write_Sync_End();
 #else
 		for (int i = 0; i < nitems; ++i)
 		{
 			if (aiocb_list[i] != nullptr)
 			{
 				if (aiocb_list[i]->aio_lio_opcode == LIO_READ)
-					libc_iotrace.Read_Sync_End();
+					get_libc_iotrace().Read_Sync_End();
 				else if (aiocb_list[i]->aio_lio_opcode == LIO_WRITE)
-					libc_iotrace.Write_Sync_End();
+					get_libc_iotrace().Write_Sync_End();
 				else
 					continue; // LIO_NOP
 			}
@@ -560,8 +569,8 @@ int TMIO_DECL(lio_listio64)(int mode, struct aiocb64 *const aiocb_list[], int ni
 		{
 			if (aiocb_list[i] != nullptr)
 			{
-				libc_iotrace.Read_Async_Start(aiocb_list[i]);
-				libc_iotrace.Write_Async_Start(aiocb_list[i]);
+				get_libc_iotrace().Read_Async_Start(aiocb_list[i]);
+				get_libc_iotrace().Write_Async_Start(aiocb_list[i]);
 			}
 		}
 
@@ -586,9 +595,9 @@ ssize_t TMIO_DECL(read)(int fd, void *buf, size_t count)
 
 	MAP_OR_FAIL(read);
 
-	libc_iotrace.Read_Sync_Start(count);
+	get_libc_iotrace().Read_Sync_Start(count);
 	ret = __real_read(fd, buf, count);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -600,9 +609,9 @@ ssize_t TMIO_DECL(write)(int fd, const void *buf, size_t count)
 
 	MAP_OR_FAIL(write);
 
-	libc_iotrace.Write_Sync_Start(count);
+	get_libc_iotrace().Write_Sync_Start(count);
 	ret = __real_write(fd, buf, count);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 
 	return (ret);
 }
@@ -614,9 +623,9 @@ ssize_t TMIO_DECL(pread)(int fd, void *buf, size_t count, off_t offset)
 
 	MAP_OR_FAIL(pread);
 
-	libc_iotrace.Read_Sync_Start(count, static_cast<off64_t>(offset));
+	get_libc_iotrace().Read_Sync_Start(count, static_cast<off64_t>(offset));
 	ret = __real_pread(fd, buf, count, offset);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -627,9 +636,9 @@ ssize_t TMIO_DECL(pread64)(int fd, void *buf, size_t count, off64_t offset)
 
 	MAP_OR_FAIL(pread64);
 
-	libc_iotrace.Read_Sync_Start(count, offset);
+	get_libc_iotrace().Read_Sync_Start(count, offset);
 	ret = __real_pread64(fd, buf, count, offset);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -640,9 +649,9 @@ ssize_t TMIO_DECL(pwrite)(int fd, const void *buf, size_t count, off_t offset)
 
 	MAP_OR_FAIL(pwrite);
 
-	libc_iotrace.Write_Sync_Start(count, static_cast<off64_t>(offset));
+	get_libc_iotrace().Write_Sync_Start(count, static_cast<off64_t>(offset));
 	ret = __real_pwrite(fd, buf, count, offset);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 
 	return (ret);
 }
@@ -653,9 +662,9 @@ ssize_t TMIO_DECL(pwrite64)(int fd, const void *buf, size_t count, off64_t offse
 
 	MAP_OR_FAIL(pwrite64);
 
-	libc_iotrace.Write_Sync_Start(count, offset);
+	get_libc_iotrace().Write_Sync_Start(count, offset);
 	ret = __real_pwrite64(fd, buf, count, offset);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 	return (ret);
 }
 
@@ -667,9 +676,9 @@ ssize_t TMIO_DECL(readv)(int fd, const struct iovec *iov, int iovcnt, off_t offs
 
 	MAP_OR_FAIL(readv);
 
-	libc_iotrace.Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
+	get_libc_iotrace().Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
 	ret = __real_readv(fd, iov, iovcnt, offset);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -680,9 +689,9 @@ ssize_t TMIO_DECL(writev)(int fd, const struct iovec *iov, int iovcnt)
 
 	MAP_OR_FAIL(writev);
 
-	libc_iotrace.Write_Sync_Start(iovcnt);
+	get_libc_iotrace().Write_Sync_Start(iovcnt);
 	ret = __real_writev(fd, iov, iovcnt);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 
 	return (ret);
 }
@@ -694,9 +703,9 @@ ssize_t TMIO_DECL(preadv)(int fd, const struct iovec *iov, int iovcnt, off_t off
 
 	MAP_OR_FAIL(preadv);
 
-	libc_iotrace.Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
+	get_libc_iotrace().Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
 	ret = __real_preadv(fd, iov, iovcnt, offset);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -707,9 +716,9 @@ ssize_t TMIO_DECL(preadv64)(int fd, const struct iovec *iov, int iovcnt, off64_t
 
 	MAP_OR_FAIL(preadv64);
 
-	libc_iotrace.Read_Sync_Start(iovcnt, offset);
+	get_libc_iotrace().Read_Sync_Start(iovcnt, offset);
 	ret = __real_preadv64(fd, iov, iovcnt, offset);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -720,9 +729,9 @@ ssize_t TMIO_DECL(pwritev)(int fd, const struct iovec *iov, int iovcnt, off_t of
 
 	MAP_OR_FAIL(pwritev);
 
-	libc_iotrace.Write_Sync_Start(iovcnt, static_cast<off64_t>(offset));
+	get_libc_iotrace().Write_Sync_Start(iovcnt, static_cast<off64_t>(offset));
 	ret = __real_pwritev(fd, iov, iovcnt, offset);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 	return (ret);
 }
 ssize_t TMIO_DECL(pwritev64)(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
@@ -732,9 +741,9 @@ ssize_t TMIO_DECL(pwritev64)(int fd, const struct iovec *iov, int iovcnt, off64_
 
 	MAP_OR_FAIL(pwritev64);
 
-	libc_iotrace.Write_Sync_Start(iovcnt, offset);
+	get_libc_iotrace().Write_Sync_Start(iovcnt, offset);
 	ret = __real_pwritev64(fd, iov, iovcnt, offset);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 	return (ret);
 }
 #ifdef HAVE_PREADV2
@@ -745,9 +754,9 @@ ssize_t TMIO_DECL(preadv2)(int fd, const struct iovec *iov, int iovcnt, off_t of
 
 	MAP_OR_FAIL(preadv2);
 
-	libc_iotrace.Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
+	get_libc_iotrace().Read_Sync_Start(iovcnt, static_cast<off64_t>(offset));
 	ret = __real_preadv2(fd, iov, iovcnt, offset, flags);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -758,9 +767,9 @@ ssize_t TMIO_DECL(preadv64v2)(int fd, const struct iovec *iov, int iovcnt, off64
 
 	MAP_OR_FAIL(preadv64v2);
 
-	libc_iotrace.Read_Sync_Start(iovcnt, offset);
+	get_libc_iotrace().Read_Sync_Start(iovcnt, offset);
 	ret = __real_preadv64v2(fd, iov, iovcnt, offset, flags);
-	libc_iotrace.Read_Sync_End();
+	get_libc_iotrace().Read_Sync_End();
 
 	return (ret);
 }
@@ -771,9 +780,9 @@ ssize_t TMIO_DECL(pwritev2)(int fd, const struct iovec *iov, int iovcnt, off_t o
 
 	MAP_OR_FAIL(pwritev2);
 
-	libc_iotrace.Write_Sync_Start(iovcnt, static_cast<off64_t>(offset));
+	get_libc_iotrace().Write_Sync_Start(iovcnt, static_cast<off64_t>(offset));
 	ret = __real_pwritev2(fd, iov, iovcnt, offset, flags);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 	return (ret);
 }
 ssize_t TMIO_DECL(pwritev64v2)(int fd, const struct iovec *iov, int iovcnt, off64_t offset, int flags)
@@ -783,9 +792,9 @@ ssize_t TMIO_DECL(pwritev64v2)(int fd, const struct iovec *iov, int iovcnt, off6
 
 	MAP_OR_FAIL(pwritev64v2);
 
-	libc_iotrace.Write_Sync_Start(iovcnt, offset);
+	get_libc_iotrace().Write_Sync_Start(iovcnt, offset);
 	ret = __real_pwritev64v2(fd, iov, iovcnt, offset, flags);
-	libc_iotrace.Write_Sync_End();
+	get_libc_iotrace().Write_Sync_End();
 	return (ret);
 }
 #endif // HAVE_PREADV2

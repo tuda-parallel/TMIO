@@ -49,8 +49,8 @@ void iotrace_finalize_helper();
 
 namespace functiontracing
 {
-    void Function_Debug(const std::string &function_name);
-    std::vector<std::string> Function_Debug_finalize();
+    class FunctionTracer;
+    FunctionTracer &get_tracer();
 }
 
 // std::atomic<uint64_t> request_id_counter(0);

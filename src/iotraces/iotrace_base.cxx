@@ -14,7 +14,7 @@
  * ara: async read actual
  */
 template <typename Tag>
-IOtraceBase<Tag>::IOtraceBase(void)
+IOtraceBase<Tag>::IOtraceBase(void) : p_aw(&aw), p_ar(&ar), p_sw(&sw), p_sr(&sr)
 {
     static_assert(std::is_same<Tag, MPI_Tag>::value || std::is_same<Tag, Libc_Tag>::value,
                   "IOtraceBase can only be instantiated with MPI_Tag or Libc_Tag.");
@@ -32,6 +32,11 @@ IOtraceBase<Tag>::IOtraceBase(void)
     size_sync_write = 0;
     size_async_read = 0;
     size_sync_read = 0;
+
+    p_aw = &aw;
+    p_ar = &ar;
+    p_sw = &sw;
+    p_sr = &sr;
 }
 
 /**

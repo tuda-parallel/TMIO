@@ -121,7 +121,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 2
+#define FUNCTION_INFO 0
 // 1: Directly print the function tracing to stdout
 // 2: Enhanced function tracing
 #endif

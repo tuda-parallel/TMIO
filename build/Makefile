@@ -1,4 +1,3 @@
-
 # $@: The file name of the target of the rule. 
 # $%: The target member name, when the target is an archive member.
 # $<: The name of the first prerequisite. 
@@ -23,7 +22,7 @@ SHELL      := /bin/bash
 VERSION    := 1.0.0
 
 PROCS         := 8  #set number of proccesses (2 --> 8)
-OPENMPTHREADS := 4
+OPENMPTHREADS := 1
 
 MPICXX = mpicxx
 MPIRUN = mpirun
@@ -63,10 +62,10 @@ endif
 
 SCOREP     := scorep --mpp=mpi --thread=pthread --io=posix --user $(MPICXX)
 PREFIX     :=
-CXX_FLAGS  :=
+CXX_FLAGS  := 
 CXX        := g++
 CXX_INC    := 
-CXX_LIB_FLAGS:= 
+CXX_LIB_FLAGS:= -ldl
 #CXX_DEBUG  := -DDEBUG -DIOTRACE_VERBOSE=1 -DIODATA_VERBOSE=1
 # see ./include/ioflags.h
 # CXX_DEBUG  := -DCOLOR_OUTPUT 
@@ -211,7 +210,8 @@ debug: CXX_FLAGS = -g
 debug: clean build
 
 gdb_run: debug
-	$(MPIRUN) -np 1  gdb --args ./test 100000 test/mpi	
+	# $(MPIRUN) -np 1  gdb --args ./test 100000 test/mpi	
+	gdb --args ./$(EXECUTABLE)
 
 gdb_help:
 	echo "----------------------------------------------"

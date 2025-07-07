@@ -2,6 +2,6 @@
 #define LIBC_INTERFACE_H
 #include "tmio.h"
 
-extern IOtraceLibc libc_iotrace; //allows to access iotrace in application code
+IOtraceLibc &get_libc_iotrace(); // allows to access iotrace in application code
 
 #endif // LIBC_INTERFACE_H

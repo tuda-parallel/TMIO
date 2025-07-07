@@ -10,7 +10,7 @@ extern "C"
 #endif
 
 #if ENABLE_LIBC_TRACE == 1
-		libc_iotrace.Summary();
+		get_libc_iotrace().Summary();
 #endif
 	}
 }

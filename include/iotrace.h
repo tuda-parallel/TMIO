@@ -4,6 +4,7 @@
 #include "tmio_helper_functions.h"
 #include <shared_mutex> // For std::shared_mutex
 #include <mutex>		// For std::mutex
+#include <cstdarg>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -59,7 +60,8 @@ public:
 
 	static constexpr const char *kLibName = IOtraceTraits<Tag>::Name;
 
-	IOtraceBase();
+	// Mandatory for initialization of IOdata
+	IOtraceBase(void);
 	void Init(void);
 	void Open(void);
 	void Summary(void);
@@ -125,10 +127,10 @@ protected:
 	mutable std::shared_mutex async_read_vecs_lock; // Read-write lock for async read fields
 
 	IOdata aw, ar, sw, sr;
-	IOdata *p_aw = &aw;
-	IOdata *p_ar = &ar;
-	IOdata *p_sw = &sw;
-	IOdata *p_sr = &sr;
+	IOdata *p_aw;
+	IOdata *p_ar;
+	IOdata *p_sw;
+	IOdata *p_sr;
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 	Bw_limit bw_limit;
