@@ -5,7 +5,8 @@
 #include <sstream>
 #include <iostream>
 #include <mutex>
-
+#include <thread>
+#include <unistd.h> // Required for getpid()
 
 namespace functiontracing
 {
@@ -63,7 +64,10 @@ namespace functiontracing
             int rank = 0;
             int size = 0;
             MPI_Comm_size(MPI_COMM_WORLD, &size);
-            if (size < 1) { return {}; }
+            if (size < 1)
+            {
+                return {};
+            }
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
             std::string function_trace_str = oss_.str();
@@ -108,15 +112,21 @@ namespace functiontracing
                 return;
             }
 
+            // Get the unique Process ID (PID) and Thread ID (TID)
+            pid_t pid = getpid();
+            std::thread::id tid = std::this_thread::get_id();
+
             if (test_counter_ > 0)
             {
-                oss_ << "\tTMIO  > " << BLUE << "\t> executed " << RED << test_counter_ + 1 << BLUE << " "
+                oss_ << "\tTMIO  > " << BLUE << "[pid " << pid << " | tid " << tid
+                     << "] > executed " << RED << test_counter_ + 1 << BLUE << " times: "
                      << current_function_name_ << "\n"
                      << BLACK;
             }
             else
             {
-                oss_ << "\tTMIO  > " << BLUE << "\t> executing " << current_function_name_ << BLACK << std::endl;
+                oss_ << "\tTMIO  > " << BLUE << "[pid " << pid << " | tid " << tid
+                     << "] > executing " << current_function_name_ << BLACK << std::endl;
             }
             test_counter_ = 0; // Reset counter
         }
@@ -136,7 +146,12 @@ namespace functiontracing
      */
     FunctionTracer &get_tracer()
     {
+
+#if FUNCTION_INFO == 3
+        static thread_local FunctionTracer instance;
+#else
         static FunctionTracer instance;
+#endif
         return instance;
     }
 
@@ -149,6 +164,9 @@ void iotrace_init_helper()
 #endif
 
 #if ENABLE_LIBC_TRACE == 1
+#if IO_BEFORE_MAIN == 0
+    get_libc_iotrace().Enable_Tracing();
+#endif
     get_libc_iotrace().Init();
 #endif
 }
@@ -168,7 +186,7 @@ void iotrace_finalize_helper()
     get_libc_iotrace().Summary();
 #endif
 
-#if FUNCTION_INFO == 2
+#if FUNCTION_INFO == 2 || FUNCTION_INFO == 3
     std::vector<std::string> all_tracing = functiontracing::get_tracer().finalize();
     for (const auto &trace : all_tracing)
     {
@@ -189,7 +207,8 @@ void Function_Debug(std::string function_name, int test_flag)
         if (flag)
         {
 
-            std::cout << "\tTMIO  > " << BLUE << "\t> executing " << function_name << BLACK << std::endl;
+            std::cout << "\tTMIO  > " << BLUE << "\t[thread "
+                      << std::this_thread::get_id() << "] > executing " << function_name << BLACK << std::endl;
             flag = false;
         }
         test_counter++;
@@ -198,15 +217,17 @@ void Function_Debug(std::string function_name, int test_flag)
     {
         if ((test_counter) > 0)
         {
-            std::cout << "\tTMIO  > " << BLUE << "\t> executed " << RED << test_counter << BLUE << " "
+            std::cout << "\tTMIO  > " << BLUE << "\t[thread "
+                      << std::this_thread::get_id() << "] > executed " << RED << test_counter << BLUE << " "
                       << "int MPI_Test(ompi_request_t**, int*, MPI_Status*)\n"
                       << BLACK;
             test_counter = 0;
         }
-        std::cout << "\tTMIO  > " << BLUE << "\t> executing " << function_name << BLACK << std::endl;
+        std::cout << "\tTMIO  > " << BLUE << "\t[thread "
+                  << std::this_thread::get_id() << "] > executing " << function_name << BLACK << std::endl;
         flag = true;
     }
-#elif FUNCTION_INFO == 2
+#elif FUNCTION_INFO == 2 || FUNCTION_INFO == 3
     // The public-facing function now calls the method on the singleton instance.
     functiontracing::get_tracer().add_trace(function_name);
 #endif

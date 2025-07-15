@@ -219,7 +219,10 @@ int TMIO_DECL(close)(int fd)
 //! ----------------------- Async Write ------------------------------
 int TMIO_DECL(aio_write)(struct aiocb *aiocbp)
 {
-	Function_Debug(__PRETTY_FUNCTION__);
+	std::string function_name = __PRETTY_FUNCTION__;
+	// Also append the fd to the function name for better debugging
+	function_name += " (fd: " + std::to_string(aiocbp->aio_fildes) + ")";
+	Function_Debug(function_name);
 	int ret;
 
 	MAP_OR_FAIL(aio_write);
@@ -274,7 +277,11 @@ int TMIO_DECL(aio_read64)(struct aiocb64 *aiocbp)
  */
 int TMIO_DECL(aio_error)(const struct aiocb *aiocbp)
 {
-	Function_Debug(__PRETTY_FUNCTION__);
+	std::string function_name = __PRETTY_FUNCTION__;
+	// Also append the fd to the function name for better debugging
+	function_name += " (fd: " + std::to_string(aiocbp->aio_fildes) + ")";
+	Function_Debug(function_name);
+
 	int ret;
 
 	MAP_OR_FAIL(aio_error);
@@ -604,7 +611,10 @@ ssize_t TMIO_DECL(read)(int fd, void *buf, size_t count)
 
 ssize_t TMIO_DECL(write)(int fd, const void *buf, size_t count)
 {
-	Function_Debug(__PRETTY_FUNCTION__);
+	std::string function_name = __PRETTY_FUNCTION__;
+	// Also append the fd to the function name for better debugging
+	function_name += " (fd: " + std::to_string(fd) + ")";
+	Function_Debug(function_name);
 	ssize_t ret;
 
 	MAP_OR_FAIL(write);
@@ -684,7 +694,10 @@ ssize_t TMIO_DECL(readv)(int fd, const struct iovec *iov, int iovcnt, off_t offs
 }
 ssize_t TMIO_DECL(writev)(int fd, const struct iovec *iov, int iovcnt)
 {
-	Function_Debug(__PRETTY_FUNCTION__);
+	std::string function_name = __PRETTY_FUNCTION__;
+	// Also append the fd to the function name for better debugging
+	function_name += " (fd: " + std::to_string(fd) + ")";
+	Function_Debug(function_name);
 	ssize_t ret;
 
 	MAP_OR_FAIL(writev);

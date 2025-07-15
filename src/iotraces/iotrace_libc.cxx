@@ -1,6 +1,27 @@
 #include "iotrace.h"
 #include <aio.h>
+#include <atomic>
 
+#if IO_BEFORE_MAIN == 0
+/**
+ * @def BEFORE_MAIN_GUARD_FUNCTION
+ * @brief If IO_BEFORE_MAIN is defined, this macro checks the atomic
+ *        `tracing_enabled_` flag and returns from the function if it's false.
+ *        Otherwise, it expands to nothing, incurring zero runtime cost.
+ * 
+ *        Also use do while to prevent dangling else issues.
+ */
+#define BEFORE_MAIN_GUARD_FUNCTION()                           \
+    do                                                         \
+    {                                                          \
+        if (!tracing_enabled_.load(std::memory_order_relaxed)) \
+        {                                                      \
+            return;                                            \
+        }                                                      \
+    } while (0)
+#else
+#define BEFORE_MAIN_GUARD_FUNCTION()
+#endif
 //! ------------------------------ Async write tracing -------------------------------
 /**
  * @brief This function complements the functionality of @ref IOtraceMPI::Write_Async_Start.
@@ -12,6 +33,8 @@
  */
 void IOtraceLibc::Write_Async_Start(const struct aiocb *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     async_write_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine write size from aiocb structure
@@ -39,6 +62,8 @@ void IOtraceLibc::Write_Async_Start(const struct aiocb *aiocbp)
 
 void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     async_write_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine write size from aiocb structure
@@ -79,6 +104,8 @@ void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp)
  */
 void IOtraceLibc::Write_Async_End(const struct aiocb *aiocbp, int write_status)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Overhead_Start(MPI_Wtime() - t_0);
 
     // Actual write ended signilized by flag of MPI_Test or at the end of MPI_Wait. This flag will always be true if the I/O operation ended
@@ -102,6 +129,8 @@ void IOtraceLibc::Write_Async_End(const struct aiocb *aiocbp, int write_status)
 
 void IOtraceLibc::Write_Async_End(const struct aiocb64 *aiocbp, int write_status)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Write_Async_End(reinterpret_cast<const struct aiocb *>(aiocbp), write_status); // Cast aiocb64 to aiocb
 }
 
@@ -115,6 +144,8 @@ void IOtraceLibc::Write_Async_End(const struct aiocb64 *aiocbp, int write_status
  */
 void IOtraceLibc::Write_Async_Required(const struct aiocb *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Overhead_Start(MPI_Wtime() - t_0);
 
     if (Check_Request_Write(aiocbp, &t_async_write_start, &size_async_write, 1))
@@ -129,6 +160,8 @@ void IOtraceLibc::Write_Async_Required(const struct aiocb *aiocbp)
 
 void IOtraceLibc::Write_Async_Required(const struct aiocb64 *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Write_Async_Required(reinterpret_cast<const struct aiocb *>(aiocbp)); // Cast aiocb64 to aiocb
 }
 //! ------------------------------ Async read tracing -------------------------------
@@ -142,6 +175,8 @@ void IOtraceLibc::Write_Async_Required(const struct aiocb64 *aiocbp)
  */
 void IOtraceLibc::Read_Async_Start(const struct aiocb *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     async_read_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine read size from aiocb structure
@@ -170,6 +205,8 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb *aiocbp)
 
 void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     async_read_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
 
     // Determine read size from aiocb structure
@@ -210,6 +247,8 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp)
  */
 void IOtraceLibc::Read_Async_End(const struct aiocb *aiocbp, int read_status)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Overhead_Start(MPI_Wtime() - t_0);
 
     if (read_status == 1)
@@ -236,6 +275,8 @@ void IOtraceLibc::Read_Async_End(const struct aiocb *aiocbp, int read_status)
 
 void IOtraceLibc::Read_Async_End(const struct aiocb64 *aiocbp, int read_status)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Read_Async_End(reinterpret_cast<const struct aiocb *>(aiocbp), read_status); // Cast aiocb64 to aiocb
 }
 
@@ -249,6 +290,8 @@ void IOtraceLibc::Read_Async_End(const struct aiocb64 *aiocbp, int read_status)
  */
 void IOtraceLibc::Read_Async_Required(const struct aiocb *aiocbp)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     Overhead_Start(MPI_Wtime() - t_0);
 
     if (Check_Request_Read(aiocbp, &t_async_read_start, &size_async_read, 1))
@@ -277,6 +320,8 @@ void IOtraceLibc::Read_Async_Required(const struct aiocb64 *aiocbp)
  */
 void IOtraceLibc::Write_Sync_Start(size_t count, off64_t offset)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_write_start = Overhead_Start(MPI_Wtime() - t_0);
     size_sync_write = count * 1; // in B
 
@@ -309,7 +354,9 @@ void IOtraceLibc::Write_Sync_Start(size_t count, off64_t offset)
  */
 void IOtraceLibc::Batch_Write_Sync_Start(size_t count, off64_t offset)
 {
-    
+    BEFORE_MAIN_GUARD_FUNCTION();
+
+
     t_sync_write_start = Overhead_Start(MPI_Wtime() - t_0);
     size_sync_write = count * 1; // in B
 
@@ -335,6 +382,8 @@ void IOtraceLibc::Batch_Write_Sync_Start(size_t count, off64_t offset)
  */
 void IOtraceLibc::Write_Sync_End(void)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
     p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
@@ -362,6 +411,8 @@ void IOtraceLibc::Write_Sync_End(void)
 
 void IOtraceLibc::Batch_Write_Sync_End()
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
     if (!batch_writing)
@@ -406,6 +457,8 @@ void IOtraceLibc::Batch_Write_Sync_End()
  */
 void IOtraceLibc::Read_Sync_Start(size_t count, off64_t offset)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_read_start = Overhead_Start(MPI_Wtime() - t_0);
     size_sync_read = count * 1; // in B
 
@@ -438,6 +491,7 @@ void IOtraceLibc::Read_Sync_Start(size_t count, off64_t offset)
  */
 void IOtraceLibc::Batch_Read_Sync_Start(size_t count, off64_t offset)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
     
     t_sync_read_start = Overhead_Start(MPI_Wtime() - t_0);
     size_sync_read = count * 1; // in B
@@ -462,6 +516,8 @@ void IOtraceLibc::Batch_Read_Sync_Start(size_t count, off64_t offset)
  */
 void IOtraceLibc::Read_Sync_End(void)
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
 
     p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
@@ -477,6 +533,8 @@ void IOtraceLibc::Read_Sync_End(void)
 
 void IOtraceLibc::Batch_Read_Sync_End()
 {
+    BEFORE_MAIN_GUARD_FUNCTION();
+
     t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
 
     if (!batch_reading)

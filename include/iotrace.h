@@ -5,6 +5,7 @@
 #include <shared_mutex> // For std::shared_mutex
 #include <mutex>		// For std::mutex
 #include <cstdarg>
+#include <atomic>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -255,7 +256,13 @@ class IOtraceLibc : public IOtraceBase<Libc_Tag>
 private:
 	bool batch_reading = false; // Flag to indicate if batch reading is in progress
 	bool batch_writing = false; // Flag to indicate if batch writing is in progress
+	std::atomic_bool tracing_enabled_{false}; // When need to trace the I/O operations before main(), checking of this flag would be skipped
 public:
+	void Enable_Tracing(void)
+	{
+		tracing_enabled_.store(true, std::memory_order_relaxed);
+	}
+
 	//*************************************
 	//* TODO: Libc Write tracing
 	//*************************************

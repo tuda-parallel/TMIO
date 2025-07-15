@@ -121,9 +121,15 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 0
+#define FUNCTION_INFO 3
+// 0: No function tracing
 // 1: Directly print the function tracing to stdout
-// 2: Enhanced function tracing
+// 2: Enhanced function tracing, which includes:
+//    - Process ID and thread ID
+//    - Some Function with also shows parameters
+//    - Process-safe function tracing (i.e. clasified base on Rank)
+//    - Print after TMIO running time profile is finished (i.e. after MPI_Finalize())
+// 3: Main thread function tracing, which base on INFO level 2, while only printing the main thread function tracing
 #endif
 
 #ifndef OVERHEAD
@@ -237,7 +243,13 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 // 1: Batch all IO operations when call `lio_listio` with `LIO_WAIT` model
 #endif
 
-
+// * IO Before main() function
+//*******************************
+#ifndef IO_BEFORE_MAIN
+#define IO_BEFORE_MAIN 0
+// 0: No record IO before main function
+// 1: Record IO before main function
+#endif
 
 
 #endif
