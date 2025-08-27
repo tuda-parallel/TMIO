@@ -6,6 +6,7 @@
 #include <mutex>		// For std::mutex
 #include <cstdarg>
 #include <atomic>
+#include <liburing.h>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -37,6 +38,7 @@ template <>
 struct IOtraceTraits<MPI_Tag>
 {
 	using RequestType = MPI_Request;
+	using RequestIDType = MPI_Request *;
 
 	static constexpr const char *Name = "MPI";
 };
@@ -48,21 +50,39 @@ template <>
 struct IOtraceTraits<Libc_Tag>
 {
 	using RequestType = const struct aiocb;
+	using RequestIDType = const struct aiocb *;
 
 	static constexpr const char *Name = "Libc";
+};
+
+struct IOuring_Tag
+{
+};
+template <>
+struct IOtraceTraits<IOuring_Tag>
+{
+	using RequestType = __u64; 
+	using RequestIDType = __u64;
+
+	static constexpr const char *Name = "IOuring";
 };
 
 template <typename Tag>
 class IOtraceBase
 {
+protected:
+	// Only allow derived classes to instantiate
+	IOtraceBase(void);
+	IOtraceBase(const IOtraceBase &) = delete;
+	void operator=(const IOtraceBase &) = delete;
+
 public:
 	using RequestType = typename IOtraceTraits<Tag>::RequestType;
-	using RequestPtr = RequestType *;
+	using RequestIDType = typename IOtraceTraits<Tag>::RequestIDType;
 
 	static constexpr const char *kLibName = IOtraceTraits<Tag>::Name;
 
 	// Mandatory for initialization of IOdata
-	IOtraceBase(void);
 	void Init(void);
 	void Open(void);
 	void Summary(void);
@@ -117,14 +137,14 @@ protected:
 	std::vector<long long> async_write_size;
 	std::vector<int> async_write_queue_req;
 	std::vector<int> async_write_queue_act;
-	std::vector<RequestPtr> async_write_request;
+	std::vector<RequestIDType> async_write_request;
 	mutable std::shared_mutex async_write_vecs_lock; // Read-write lock for async write fields
 
 	std::vector<double> async_read_time;
 	std::vector<long long> async_read_size;
 	std::vector<int> async_read_queue_req;
 	std::vector<int> async_read_queue_act;
-	std::vector<RequestPtr> async_read_request;
+	std::vector<RequestIDType> async_read_request;
 	mutable std::shared_mutex async_read_vecs_lock; // Read-write lock for async read fields
 
 	IOdata aw, ar, sw, sr;
@@ -143,8 +163,8 @@ protected:
 	//*************************************
 	//* Request monitoring
 	//*************************************
-	bool Check_Request_Write(RequestPtr, double *, long long *, int mode);
-	bool Check_Request_Read(RequestPtr, double *, long long *, int mode);
+	bool Check_Request_Write(RequestIDType, double *, long long *, int mode);
+	bool Check_Request_Read(RequestIDType, double *, long long *, int mode);
 	bool Act_Done(int mode = 0);
 
 	//*************************************
@@ -229,7 +249,7 @@ public:
 * ********************************************************
 */
 
-class IOtraceMPI : public IOtraceBase<MPI_Tag>
+class IOtraceMPI final : public IOtraceBase<MPI_Tag>
 {
 public:
 	//*************************************
@@ -251,7 +271,7 @@ public:
 	void Read_Sync_End(void);
 };
 
-class IOtraceLibc : public IOtraceBase<Libc_Tag>
+class IOtraceLibc final : public IOtraceBase<Libc_Tag>
 {
 private:
 	bool batch_reading = false; // Flag to indicate if batch reading is in progress
@@ -264,7 +284,7 @@ public:
 	}
 
 	//*************************************
-	//* TODO: Libc Write tracing
+	//* Libc Write tracing
 	//*************************************
 	void Write_Async_Start(const struct aiocb *aiocbp);
 	void Write_Async_Start(const struct aiocb64 *aiocbp);
@@ -278,7 +298,7 @@ public:
 	void Batch_Write_Sync_End();
 
 	//*************************************
-	//* TODO: Libc Read tracing
+	//* Libc Read tracing
 	//*************************************
 	void Read_Async_Start(const struct aiocb *aiocbp);
 	void Read_Async_Start(const struct aiocb64 *aiocbp);
@@ -290,6 +310,25 @@ public:
 	void Batch_Read_Sync_Start(size_t count, off64_t offset = 0);
 	void Read_Sync_End(void);
 	void Batch_Read_Sync_End();
+};
+
+class IOtraceIOuring final : public IOtraceBase<IOuring_Tag>
+{
+	using RequestIDType = typename IOtraceBase<IOuring_Tag>::RequestIDType;
+public:
+	//*************************************
+	//* IO_uring Write tracing
+	//*************************************
+	void Write_Async_Start(RequestIDType request, size_t size);
+	void Write_Async_End(RequestIDType request, int write_status = 1);
+	void Write_Async_Required(RequestIDType request);
+
+	//*************************************
+	//* IO_uring Read tracing
+	//*************************************
+	void Read_Async_Start(RequestIDType request, size_t size);
+	void Read_Async_End(RequestIDType request, int read_status = 1);
+	void Read_Async_Required(RequestIDType request);
 };
 
 #endif // IOTRACE_H

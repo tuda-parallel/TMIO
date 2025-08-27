@@ -21,13 +21,24 @@
  * @brief The TMIO_DECL macro provides the appropriate wrapper function names,
  * depending on whether the TMIO library is statically or dynamically linked.
  */
+#ifdef TMIO_STATIC_WRAP
+// For static linking with --wrap
+#define TMIO_DECL(__func) __wrap_##__func
+#else
+// For dynamic linking with LD_PRELOAD
 #define TMIO_DECL(__func) __func
-
+#endif
 /**
  * @brief Map the desired function call to a pointer called __real_NAME at run
  * time.  Note that we fall back to looking for the same symbol with a P
  * prefix to handle MPI bindings that call directly to the PMPI layer.
  */
+#ifdef TMIO_STATIC_WRAP
+// In static mode, this does nothing. The linker has already connected
+// __real_write for us.
+#define MAP_OR_FAIL(__func)
+#else
+// In dynamic mode, it does the dlsym lookup.
 #define MAP_OR_FAIL(__func)                                              \
     if (!(__real_##__func))                                              \
     {                                                                    \
@@ -40,7 +51,7 @@
             exit(1);                                                     \
         }                                                                \
     }
-
+#endif
 //! debug
 void Function_Debug(std::string function_name, int flag = 0);
 

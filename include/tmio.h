@@ -21,6 +21,10 @@
 #include "interfaces/libc_interface.h"
 #endif // ENABLE_LIBC_TRACE
 
+#if ENABLE_IOURING_TRACE == 1
+#include "interfaces/iouring_interface.h"
+#endif // ENABLE_IOURING_TRACE
+
 
 #include "tmio_c.h" // Include the C-compatible header
 

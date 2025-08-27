@@ -16,9 +16,6 @@
 template <typename Tag>
 IOtraceBase<Tag>::IOtraceBase(void) : p_aw(&aw), p_ar(&ar), p_sw(&sw), p_sr(&sr)
 {
-    static_assert(std::is_same<Tag, MPI_Tag>::value || std::is_same<Tag, Libc_Tag>::value,
-                  "IOtraceBase can only be instantiated with MPI_Tag or Libc_Tag.");
-
     rank = 0;
     processes = 0;
     open = 0;
@@ -341,7 +338,7 @@ void IOtraceBase<Tag>::Close(void)
  */
 template <typename Tag>
 bool IOtraceBase<Tag>::
-    Check_Request_Write(RequestPtr request, double *start_time, long long *size, int mode)
+    Check_Request_Write(RequestIDType request, double *start_time, long long *size, int mode)
 {
 
     if (!async_write_request.empty())
@@ -400,7 +397,7 @@ bool IOtraceBase<Tag>::
  * @return \e true for the first time the async I/O operation ended.
  */
 template <typename Tag>
-bool IOtraceBase<Tag>::Check_Request_Read(RequestPtr request, double *start_time, long long *size, int mode)
+bool IOtraceBase<Tag>::Check_Request_Read(RequestIDType request, double *start_time, long long *size, int mode)
 {
     // FIXME: Add pthread lock to protect the following variables
     if (!async_read_request.empty())
@@ -647,3 +644,6 @@ template class IOtraceBase<MPI_Tag>;
 
 // Explicit instantiation for Libc_Tag
 template class IOtraceBase<Libc_Tag>;
+
+// Explicit instantiation for IOuring_Tag
+template class IOtraceBase<IOuring_Tag>;
