@@ -13,35 +13,18 @@
  */
 void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
-    // get write timestamp
-    async_write_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
-
-    // determnine write size
+    double start_time = MPI_Wtime() - t_0;
     MPI_Type_size(datatype, &data_size_write);
-    async_write_size.push_back(count * data_size_write);
-
-    // phase start if first request. Add phase data and offset
-    // [Note] Start of Async Phrase is control by if `async_write_time` is empty, instead of `phrase`
-    // [Note] Since Sync/Async are tracked separately, not need to consider the merge of both
-    p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset);
-
-    // save request flag and set request counter (required and actual to one)
-    async_write_request.push_back(request);
-    async_write_queue_req.push_back(1);
-    async_write_queue_act.push_back(1);
+    long long total_size = static_cast<long long>(count) * data_size_write;
 
     IOtraceMPI::LogWithAction<VerbosityLevel::BASIC_LOG>([&]()
                                                          {
         static long int counter = 1;
         IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
-            "%s > rank %i > #%li will async write %i x %i = %lli bytes\n",
-            caller, rank, counter++, count, data_size_write, async_write_size.back()); });
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> started asnyc write @ %f s %s\n", caller, rank, GREEN, async_write_time.back(), BLACK);
-    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
+            "%s > rank %i > #%li will asnyc write %i x %i = %lli bytes \n",
+                    caller, rank, counter++, count, data_size_write, total_size); });
 
-    Overhead_End();
+    Write_Async_Start_Impl(request, total_size, offset, start_time);
 }
 
 //************************************************************************************
@@ -54,31 +37,7 @@ void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request
  */
 void IOtraceMPI::Write_Async_End(MPI_Request *request, int write_status)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
-
-    // actual write ended signilized by flag of MPI_Test or at the end of MPI_Wait. This flag will always be true if the I/O operation ended
-    if (write_status == 1)
-    {
-        //  first time the status of the actual write is quarried. Solves the problem of several MPI_Test
-        if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 2))
-        {
-            // add values to traced data and add phase values if condition is true:
-            // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
-            // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_request.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
-            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
-
-            IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-                "%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
-            IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-                "%s > rank %i %s>> write async requests ended at %f %s\n", caller, rank, RED, p_aw->phase_data.back().t_end_act, BLACK);
-        }
-    }
-
-    IOtraceMPI::LogWithCondition<VerbosityLevel::DEBUG_LOG>(
-        write_status == 0,
-        "%s > rank %i %s>>>> testing for asnc write completion %s\n", caller, rank, RED, BLACK);
-
-    Overhead_End();
+    Write_Async_End_Impl(request, write_status);
 }
 
 //************************************************************************************
@@ -91,16 +50,7 @@ void IOtraceMPI::Write_Async_End(MPI_Request *request, int write_status)
  */
 void IOtraceMPI::Write_Async_Required(MPI_Request *request)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
-
-    if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
-    {
-        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0);
-
-        IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-            "%s > rank %i %s>> active write async requests %li %s\n", caller, rank, GREEN, async_write_request.size(), BLACK);
-    }
-    Overhead_End();
+    Write_Async_Required_Impl(request);
 }
 
 //! ------------------------------ Async read tracing -------------------------------
@@ -116,20 +66,9 @@ void IOtraceMPI::Write_Async_Required(MPI_Request *request)
  */
 void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
-    // get read timestamp
-    async_read_time.push_back(Overhead_Start(MPI_Wtime() - t_0));
-
-    // determnine read size
+    double start_time = MPI_Wtime() - t_0;
     MPI_Type_size(datatype, &data_size_read);
-    async_read_size.push_back(count * data_size_read);
-
-    // phase start if first request. Add phase data and offset
-    p_ar->Phase_Start(async_read_request.empty(), async_read_time.back(), async_read_size.back(), offset);
-
-    // save request flag and set request counter (required and actual to one)
-    async_read_request.push_back(request);
-    async_read_queue_req.push_back(1);
-    async_read_queue_act.push_back(1);
+    long long total_size = static_cast<long long>(count) * data_size_read;
 
     IOtraceMPI::LogWithAction<VerbosityLevel::BASIC_LOG>([&]()
                                                          {
@@ -137,11 +76,8 @@ void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request 
         IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
             "%s > rank %i > #%li will asnyc read %i x %i = %lli bytes \n",
                     caller, rank, counter++, count, data_size_read, async_read_size.back()); });
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> started asnyc read @ %f s %s\n", caller, rank, GREEN, async_read_time.back(), BLACK);
-    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-    Overhead_End();
+
+    Read_Async_Start_Impl(request, total_size, offset, start_time);
 }
 
 //************************************************************************************
@@ -154,33 +90,7 @@ void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request 
  */
 void IOtraceMPI::Read_Async_End(MPI_Request *request, int read_status)
 {
-
-    Overhead_Start(MPI_Wtime() - t_0);
-
-    if (read_status == 1)
-    { // read ended
-        if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 2))
-        {
-            // add values to traced data and add phase values if condition is true
-            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, (async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
-            // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
-            p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, Act_Done(1));
-            // std::cout << "Act_Done return" << Act_Done(1) << std::endl;
-
-            IOtraceMPI::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
-                                                                    {
-                IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-                    "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
-                iohf::Disp(async_read_queue_req, async_read_queue_req.size(), std::string(caller) + " > rank " + std::to_string(rank) + " >> async_read_queue_req ", 1); });
-            IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-                "%s > rank %i %s>> read async requests ended at %f %s\n", caller, rank, RED, p_ar->phase_data.back().t_end_act, BLACK);
-        }
-    }
-
-    IOtraceMPI::LogWithCondition<VerbosityLevel::DEBUG_LOG>(read_status == 0,
-                                                            "%s > rank %i %s>>>> testing for async read completion %s\n", caller, rank, RED, BLACK);
-
-    Overhead_End();
+    Read_Async_End_Impl(request, read_status);
 }
 
 //************************************************************************************
@@ -193,16 +103,7 @@ void IOtraceMPI::Read_Async_End(MPI_Request *request, int read_status)
  */
 void IOtraceMPI::Read_Async_Required(MPI_Request *request)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
-
-    if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
-    {
-        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0);
-
-        IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-            "%s > rank %i %s>> active read async requests %li%s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
-    }
-    Overhead_End();
+    Read_Async_Required_Impl(request);
 }
 
 //! ------------------------------ Sync write tracing -------------------------------
@@ -217,29 +118,13 @@ void IOtraceMPI::Read_Async_Required(MPI_Request *request)
  */
 void IOtraceMPI::Write_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset offset)
 {
-
     // get write timestamp
-    t_sync_write_start = Overhead_Start(MPI_Wtime() - t_0);
+    double start_time = MPI_Wtime() - t_0;
+    t_sync_write_start = Overhead_Start(start_time);
 
-    // determnine write size
     MPI_Type_size(datatype, &data_size_write);
-    size_sync_write = count * data_size_write; // in B
-
-#if SYNC_MODE == 1
-    p_sw->Phase_Start(p_sw->flag && !(p_sw->phase), t_sync_write_start, size_sync_write, offset);
-#else
-    p_sw->Phase_Start(true, t_sync_write_start, size_sync_write, offset);
-#endif
-
-    // Logging
-    IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
-        "%s > rank %i > will write %i x %i bytes \n", caller, rank, count, data_size_write);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> started sync write @ %.2f s %s\n", caller, rank, GREEN, t_sync_write_start, BLACK);
-    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-
-    Overhead_End();
+    size_sync_write = static_cast<long long>(count) * data_size_write;
+    Write_Sync_Start_Impl(size_sync_write, offset, start_time);
 }
 
 //************************************************************************************
@@ -250,17 +135,7 @@ void IOtraceMPI::Write_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset o
  */
 void IOtraceMPI::Write_Sync_End(void)
 {
-    t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
-
-    p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
-
-#if SYNC_MODE == 0
-    p_sw->Phase_End_Sync(t_sync_write_end);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> ended   sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_end, BLACK);
-#endif
-
-    Overhead_End();
+    Write_Sync_End_Impl();
 }
 
 //! ------------------------------ Sync read tracing -------------------------------
@@ -276,27 +151,12 @@ void IOtraceMPI::Write_Sync_End(void)
 void IOtraceMPI::Read_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset offset)
 {
     // get read timestamp
-    t_sync_read_start = Overhead_Start(MPI_Wtime() - t_0);
-
-    // determnine read size
+    double start_time = MPI_Wtime() - t_0;
+    t_sync_read_start = Overhead_Start(start_time);
+    
     MPI_Type_size(datatype, &data_size_read);
-    size_sync_read = count * data_size_read; // in B
-
-#if SYNC_MODE == 1
-    p_sr->Phase_Start(p_sr->flag && !(p_sr->phase), t_sync_read_start, size_sync_read, offset);
-#else
-    p_sr->Phase_Start(true, t_sync_read_start, size_sync_read, offset);
-#endif
-
-    // Logging
-    IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
-        "%s > rank %i > will read %i x %i bytes \n", caller, rank, count, data_size_read);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> started sync read @ %.2f s %s\n", caller, rank, GREEN, t_sync_read_start, BLACK);
-    IOtraceMPI::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset, BLACK);
-
-    Overhead_End();
+    size_sync_read = static_cast<long long>(count) * data_size_read;
+    Read_Sync_Start_Impl(size_sync_read, offset, start_time);
 }
 
 //************************************************************************************
@@ -307,15 +167,5 @@ void IOtraceMPI::Read_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset of
  */
 void IOtraceMPI::Read_Sync_End(void)
 {
-    t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
-
-    p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
-
-#if SYNC_MODE == 0
-    p_sr->Phase_End_Sync(t_sync_read_end);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
-        "%s > rank %i %s>> ended   sync read @ %f s %s\n", caller, rank, GREEN, t_sync_read_end, BLACK);
-#endif
-
-    Overhead_End();
+    Read_Sync_End_Impl();
 }

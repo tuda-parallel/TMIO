@@ -2,11 +2,12 @@
 #define IOTRACE_H
 
 #include "tmio_helper_functions.h"
-#include <shared_mutex> // For std::shared_mutex
-#include <mutex>		// For std::mutex
+#include <shared_mutex>
+#include <mutex>
 #include <cstdarg>
 #include <atomic>
 #include <liburing.h>
+#include <unordered_map>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -62,7 +63,10 @@ template <>
 struct IOtraceTraits<IOuring_Tag>
 {
 	using RequestType = __u64; 
-	using RequestIDType = __u64;
+	// Though lib_uring uses void* as user_data in io_uring_sqe_set_data and io_uring_cqe_get_data
+	// But for `struct io_uring_sqe`, the type of user_data is defined as __u64, 
+	// so we use __u64 here to avoid casting issues.
+	using RequestIDType = __u64; 
 
 	static constexpr const char *Name = "IOuring";
 };
@@ -159,6 +163,24 @@ protected:
 
 	char caller[12] = "\tIOtrace";
 	MPI_Comm IO_WORLD;
+
+	//*************************************
+	//* Write tracing
+	//*************************************
+    void Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Write_Async_End_Impl(RequestIDType request, int write_status);
+    void Write_Async_Required_Impl(RequestIDType request);
+    void Write_Sync_Start_Impl(long long size, long long offset, double start_time);
+    void Write_Sync_End_Impl();
+
+	//*************************************
+	//* Read tracing
+	//*************************************
+    void Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Read_Async_End_Impl(RequestIDType request, int read_status);
+    void Read_Async_Required_Impl(RequestIDType request);
+    void Read_Sync_Start_Impl(long long size, long long offset, double start_time);
+    void Read_Sync_End_Impl();
 
 	//*************************************
 	//* Request monitoring
@@ -314,21 +336,32 @@ public:
 
 class IOtraceIOuring final : public IOtraceBase<IOuring_Tag>
 {
+	enum class RequestQueueType
+	{
+		SREAD,
+		SWRITE,		
+		AREAD,
+		AWRITE
+	};
+
 	using RequestIDType = typename IOtraceBase<IOuring_Tag>::RequestIDType;
 public:
 	//*************************************
 	//* IO_uring Write tracing
 	//*************************************
-	void Write_Async_Start(RequestIDType request, size_t size);
+	void Write_Async_Start(const struct io_uring_sqe *sqe);
 	void Write_Async_End(RequestIDType request, int write_status = 1);
 	void Write_Async_Required(RequestIDType request);
 
 	//*************************************
 	//* IO_uring Read tracing
 	//*************************************
-	void Read_Async_Start(RequestIDType request, size_t size);
+	void Read_Async_Start(const struct io_uring_sqe *sqe);
 	void Read_Async_End(RequestIDType request, int read_status = 1);
 	void Read_Async_Required(RequestIDType request);
+private:
+	std::unordered_map<struct io_uring *, struct io_uring_sqe *> requests_to_submit;
+	std::unordered_map<struct io_uring *, std::unordered_map<__u64, RequestQueueType>> request_queues;
 };
 
 #endif // IOTRACE_H
