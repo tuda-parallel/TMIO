@@ -611,10 +611,7 @@ ssize_t TMIO_DECL(read)(int fd, void *buf, size_t count)
 
 ssize_t TMIO_DECL(write)(int fd, const void *buf, size_t count)
 {
-	std::string function_name = __PRETTY_FUNCTION__;
-	// Also append the fd to the function name for better debugging
-	function_name += " (fd: " + std::to_string(fd) + ")";
-	Function_Debug(function_name);
+	Function_Debug(__PRETTY_FUNCTION__);
 	ssize_t ret;
 
 	MAP_OR_FAIL(write);
@@ -694,10 +691,7 @@ ssize_t TMIO_DECL(readv)(int fd, const struct iovec *iov, int iovcnt, off_t offs
 }
 ssize_t TMIO_DECL(writev)(int fd, const struct iovec *iov, int iovcnt)
 {
-	std::string function_name = __PRETTY_FUNCTION__;
-	// Also append the fd to the function name for better debugging
-	function_name += " (fd: " + std::to_string(fd) + ")";
-	Function_Debug(function_name);
+	Function_Debug(__PRETTY_FUNCTION__);
 	ssize_t ret;
 
 	MAP_OR_FAIL(writev);
