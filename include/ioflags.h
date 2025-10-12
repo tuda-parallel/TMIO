@@ -16,7 +16,7 @@
 #endif
 
 #ifndef ENABLE_IOURING_TRACE
-#define ENABLE_IOURING_TRACE 1 // set to 1 to enable tracing
+#define ENABLE_IOURING_TRACE 0 // set to 1 to enable tracing
 // 0: disable tracing
 // 1: enable tracing
 #endif
@@ -125,7 +125,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 3
+#define FUNCTION_INFO 0
 // 0: No function tracing
 // 1: Directly print the function tracing to stdout
 // 2: Enhanced function tracing, which includes:

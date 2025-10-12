@@ -121,7 +121,6 @@ void IOtraceBase<Tag>::Summary(void)
     p_sw->Bandwidth_In_Phase_Offline();
     p_sr->Bandwidth_In_Phase_Offline();
 #endif
-    // [Note] Should it be number of I/O phrase?
     // number of I/O operations each rank performed ({async write, async read, sync write, sync read})
     n_struct n = {
         (int)p_aw->phase_data.size(),
@@ -264,7 +263,7 @@ void IOtraceBase<Tag>::Summary(void)
     }
     if (!finalize)
     {
-        t_summary = MPI_Wtime() - t_0; 
+        t_summary = MPI_Wtime() - t_0;
         delta_t_app = 0;
         delta_t_io_overhead = 0;
 
@@ -312,7 +311,6 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
     Overhead_End();
 }
 
-
 //************************************************************************************
 //*                               2. Write_Async_End
 //************************************************************************************
@@ -342,8 +340,8 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
     }
 
     IOtraceBase<Tag>::LogWithCondition<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>> write async requests ended at %f %s\n",
-        caller, rank, RED, p_aw->phase_data.back().t_end_act, BLACK);
+        write_status == 0,
+        "%s > rank %i %s>>>> testing for asnc write completion %s\n", caller, rank, RED, BLACK);
 
     Overhead_End();
 }
@@ -427,8 +425,8 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
         }
     }
 
-    IOtraceBase<Tag>::LogWithCondition<VerbosityLevel::DEBUG_LOG>(
-        !read_status, "%s > rank %i %s>>> async read not ended yet %s\n", caller, rank, YELLOW, BLACK);
+    IOtraceBase<Tag>::LogWithCondition<VerbosityLevel::DEBUG_LOG>(read_status == 0,
+                                                                  "%s > rank %i %s>>>> testing for async read completion %s\n", caller, rank, RED, BLACK);
 
     Overhead_End();
 }
@@ -462,7 +460,7 @@ void IOtraceBase<Tag>::Write_Sync_Start_Impl(long long size, long long offset, d
 
     // determnine write size
     size_sync_write = size;
-    
+
 #if SYNC_MODE == 1
     p_sw->Phase_Start(p_sw->flag && !(p_sw->phase), t_sync_write_start, size_sync_write, offset);
 #else
@@ -487,9 +485,9 @@ void IOtraceBase<Tag>::Write_Sync_End_Impl(void)
 
     p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
 
-#if SYNC_MODE == 1
+#if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
         "%s > rank %i %s>> ended   sync write @ %f s %s\n", caller, rank, GREEN, t_sync_write_end, BLACK);
 #endif
 
@@ -507,7 +505,7 @@ void IOtraceBase<Tag>::Read_Sync_Start_Impl(long long size, long long offset, do
     t_sync_read_start = Overhead_Start(start_time);
 
     // determnine read size
-    size_sync_read = size;  
+    size_sync_read = size;
 
 #if SYNC_MODE == 1
     p_sr->Phase_Start(p_sr->flag && !(p_sr->phase), t_sync_read_start, size_sync_read, offset);
@@ -537,9 +535,9 @@ void IOtraceBase<Tag>::Read_Sync_End_Impl(void)
 
     p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
 
-#if SYNC_MODE == 1
+#if SYNC_MODE == 0
     p_sr->Phase_End_Sync(t_sync_read_end);
-    IOtraceMPI::Log<VerbosityLevel::DETAILED_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
         "%s > rank %i %s>> ended   sync read @ %f s %s\n", caller, rank, GREEN, t_sync_read_end, BLACK);
 #endif
 
