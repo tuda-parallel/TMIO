@@ -108,6 +108,7 @@ void IOtraceIOuring::Unregister_Ring(struct io_uring *ring)
 
 void IOtraceIOuring::Process_Submissions(struct io_uring *ring)
 {
+    double start_time = MPI_Wtime() - t_0;
     // First, scan the SQ ring to find what's new. We do this outside the lock.
     RingTraceState *state = find_ring_state(ring);
     if (!state)
@@ -131,7 +132,6 @@ void IOtraceIOuring::Process_Submissions(struct io_uring *ring)
             try
             {
                 UringSqeInfo info = parse_sqe_info(sqe);
-                double start_time = MPI_Wtime() - t_0;
                 if (info.is_write)
                 {
                     state->pending_writes.insert(info.user_data);
@@ -163,7 +163,8 @@ void IOtraceIOuring::Process_Submissions(struct io_uring *ring)
             try
             {
                 UringSqeInfo info = parse_sqe_info(sqe);
-                StagedRequest req = {ring, info.user_data, info.total_size, info.offset, info.is_write};
+                double submission_time = MPI_Wtime() - t_0;
+                StagedRequest req = {ring, info.user_data, info.total_size, info.offset, info.is_write, submission_time};
                 if (!staged_requests_queue_.push(req))
                 {
                     Log<VerbosityLevel::BASIC_LOG>("%s > rank %i > TMIO warning: io_uring staging queue is full. Request may be delayed.\n", caller, rank);
@@ -245,14 +246,12 @@ void IOtraceIOuring::drain_staged_requests_locked()
         RingTraceState *state = find_ring_state(req.ring);
         if (!state)
             continue; // Ring was unregistered in the meantime
-
-        double start_time = MPI_Wtime() - t_0;
         if (req.is_write)
         {
             if (state->pending_writes.find(req.user_data) == state->pending_writes.end())
             {
                 state->pending_writes.insert(req.user_data);
-                Write_Async_Start(req.user_data, req.total_size, req.offset, start_time);
+                Write_Async_Start(req.user_data, req.total_size, req.offset, req.submission_time);
             }
         }
         else
@@ -260,7 +259,7 @@ void IOtraceIOuring::drain_staged_requests_locked()
             if (state->pending_reads.find(req.user_data) == state->pending_reads.end())
             {
                 state->pending_reads.insert(req.user_data);
-                Read_Async_Start(req.user_data, req.total_size, req.offset, start_time);
+                Read_Async_Start(req.user_data, req.total_size, req.offset, req.submission_time);
             }
         }
     }
@@ -288,9 +287,13 @@ void IOtraceIOuring::reap_completions_locked(RingTraceState &state)
     unsigned head = state.last_known_cq_head;
     unsigned cqe_count = 0;
 
+    // Manually implement the loop instead of using the io_uring_for_each_cqe macro
+    unsigned ring_tail = io_uring_smp_load_acquire(cq->ktail);
     struct io_uring_cqe *cqe;
-    io_uring_for_each_cqe(ring, head, cqe)
+
+    while (head != ring_tail)
     {
+        cqe = &cq->cqes[head & cq->ring_mask];
         cqe_count++;
         __u64 user_data = cqe->user_data;
 
@@ -302,12 +305,15 @@ void IOtraceIOuring::reap_completions_locked(RingTraceState &state)
         {
             Read_Async_End(user_data, cqe->res);
         }
+        head++;
     }
 
     const unsigned ring_head = *cq->khead;
-    if (ring_head - state.last_known_cq_head > cqe_count)
+    if (ring_head > state.last_known_cq_head + cq->ring_sz)
     {
-        Log<VerbosityLevel::BASIC_LOG>("%s > rank %i > TMIO warning: CQ head advanced by %u, but only %u CQEs were seen. Completions may have been missed.\n", caller, rank, ring_head - state.last_known_cq_head, cqe_count);
+        // If the khead is go over the last known head, might be the risk of losting some completions.
+        Log<VerbosityLevel::BASIC_LOG>("%s > rank %i > TMIO warning: io_uring completion queue head jumped from %u to %u. Some completions may have been lost.\n",
+                                       caller, rank, state.last_known_cq_head, ring_head);
     }
 
     state.last_known_cq_head = head;
@@ -352,7 +358,17 @@ void IOtraceIOuring::Write_Async_Start(RequestIDType requestID, long long size, 
 }
 void IOtraceIOuring::Write_Async_End(RequestIDType requestID, int status)
 {
-    Write_Async_End_Impl(requestID, status);
+    int write_status;
+    if (status >= 0)
+    {
+        write_status = 1; // Success
+    }
+    else
+    {
+        write_status = 0; // Propagate error code
+    }
+    Write_Async_Required(requestID);
+    Write_Async_End_Impl(requestID, write_status);
 }
 void IOtraceIOuring::Read_Async_Start(RequestIDType requestID, long long size, long long offset, double start_time)
 {
@@ -360,7 +376,17 @@ void IOtraceIOuring::Read_Async_Start(RequestIDType requestID, long long size, l
 }
 void IOtraceIOuring::Read_Async_End(RequestIDType requestID, int status)
 {
-    Read_Async_End_Impl(requestID, status);
+    int read_status;
+    if (status >= 0)
+    {
+        read_status = 1; // Success
+    }
+    else
+    {
+        read_status = 0; // Propagate error code
+    }
+    Read_Async_Required(requestID);
+    Read_Async_End_Impl(requestID, read_status);
 }
 void IOtraceIOuring::Write_Async_Required(RequestIDType requestID)
 {

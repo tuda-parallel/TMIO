@@ -12,5 +12,9 @@ extern "C"
 #if ENABLE_LIBC_TRACE == 1
 		get_libc_iotrace().Summary();
 #endif
+
+#if ENABLE_IOURING_TRACE == 1
+		get_iouring_iotrace().Summary();
+#endif
 	}
 }

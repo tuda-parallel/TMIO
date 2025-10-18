@@ -169,6 +169,10 @@ void iotrace_init_helper()
 #endif
     get_libc_iotrace().Init();
 #endif
+
+#if ENABLE_IOURING_TRACE == 1
+    get_iouring_iotrace().Init();
+#endif
 }
 
 void iotrace_finalize_helper()
@@ -184,6 +188,11 @@ void iotrace_finalize_helper()
 #if ENABLE_LIBC_TRACE == 1
     get_libc_iotrace().Set("finalize", true);
     get_libc_iotrace().Summary();
+#endif
+
+#if ENABLE_IOURING_TRACE == 1
+    get_iouring_iotrace().Set("finalize", true);
+    get_iouring_iotrace().Summary();
 #endif
 
 #if FUNCTION_INFO == 2 || FUNCTION_INFO == 3

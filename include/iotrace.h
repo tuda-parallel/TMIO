@@ -369,6 +369,7 @@ private:
         long long total_size;
         off_t offset;
         bool is_write;
+		double submission_time;
     };
 
     // Cache-friendly state for each tracked io_uring instance.
@@ -424,11 +425,11 @@ private:
         }
 
     private:
+		alignas(64) std::atomic<size_t> head_;
+		alignas(64) std::atomic<size_t> tail_;
         const size_t size_;
         const size_t mask_;
         std::vector<T> buffer_;
-        alignas(64) std::atomic<size_t> head_;
-        alignas(64) std::atomic<size_t> tail_;
     };
 
     // --- Private Member Variables ---

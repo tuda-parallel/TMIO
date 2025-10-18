@@ -287,6 +287,7 @@ void IOtraceBase<Tag>::Summary(void)
 template <typename Tag>
 void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time)
 {
+    Overhead_Start(start_time);
     // get write timestamp
     async_write_time.push_back(start_time);
 
@@ -374,6 +375,7 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
 template <typename Tag>
 void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time)
 {
+    Overhead_Start(start_time);
     // get read timestamp
     async_read_time.push_back(start_time);
 
