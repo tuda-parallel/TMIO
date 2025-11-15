@@ -1,9 +1,10 @@
+#include "iotrace.h"
+#if ENABLE_IOURING_TRACE == 1
 #include <liburing.h>
 #include <sys/uio.h> // For struct iovec
 #include <stdexcept> // For std::runtime_error
 #include <string>    // For std::to_string
 #include <cstdlib>   // For abort()
-#include "iotrace.h"
 
 namespace
 {
@@ -396,3 +397,4 @@ void IOtraceIOuring::Read_Async_Required(RequestIDType requestID)
 {
     Read_Async_Required_Impl(requestID);
 }
+#endif // ENABLE_IOURING_TRACE

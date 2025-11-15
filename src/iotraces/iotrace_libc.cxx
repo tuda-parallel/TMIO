@@ -1,4 +1,6 @@
 #include "iotrace.h"
+
+#if ENABLE_LIBC_TRACE == 1
 #include <aio.h>
 #include <atomic>
 
@@ -411,3 +413,4 @@ void IOtraceLibc::Batch_Read_Sync_End()
         "%s > rank %i %s>>> batch reading end time %f %s\n", caller, rank, YELLOW, t_sync_read_end, BLACK);
     Overhead_End();
 }
+#endif // ENABLE_LIBC_TRACE

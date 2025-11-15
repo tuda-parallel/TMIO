@@ -303,10 +303,10 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
     async_write_queue_act.push_back(1);
 
     // Logging
-    IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>> started async write @ %.2f s %s\n", caller, rank,
         GREEN, t_async_write_start, BLACK);
-    IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
     Overhead_End();
@@ -340,7 +340,7 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         }
     }
 
-    IOtraceBase<Tag>::LogWithCondition<VerbosityLevel::DEBUG_LOG>(
+    IOtraceBase<Tag>::LogWithCondition<VerbosityLevel::BASIC_LOG>(
         write_status == 0,
         "%s > rank %i %s>>>> testing for asnc write completion %s\n", caller, rank, RED, BLACK);
 
@@ -353,17 +353,16 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
 template <typename Tag>
 void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
 {
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i %s>> Wait reached (Req waiting) async write @ %.8f s, (Request: %ld)\n", caller, rank,
+        GREEN, MPI_Wtime() - t_0, request);
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
         p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0);
 
-        IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
-                                                                      {
-                static long int counter = 1;
-                IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
-                    "%s > rank %i %s>> Wait reached (Req ended). Active async write requests %li/%li %s\n", 
-                    caller, rank, GREEN, async_write_request.size(),counter++, BLACK); });
+        IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+            "%s > rank %i > write %lli bytes \n", caller, rank, size_async_write);
     }
     Overhead_End();
 }
@@ -391,10 +390,10 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
     async_read_queue_act.push_back(1);
 
     // Logging
-    IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>> started async read @ %.2f s %s\n", caller, rank,
         GREEN, t_async_read_start, BLACK);
-    IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
     Overhead_End();
@@ -406,6 +405,10 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
 template <typename Tag>
 void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_status)
 {
+    // Print the request being waited on
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i %s>> Wait reached (Act waiting) async read @ %.8f s, (Request: %ld)\n", caller, rank,
+        GREEN, MPI_Wtime() - t_0, request);
     Overhead_Start(MPI_Wtime() - t_0);
 
     // actual read ended signilized by flag of MPI_Test or at the end of MPI_Wait. This flag will always be true if the I/O operation ended
@@ -421,7 +424,7 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
 
             IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
                 "%s > rank %i > read %lli bytes \n", caller, rank, size_async_read);
-            IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
                 "%s > rank %i %s>> read async requests ended async read @ %.2f s %s\n", caller, rank,
                 GREEN, MPI_Wtime() - t_0, BLACK);
         }
@@ -439,12 +442,24 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
 template <typename Tag>
 void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
 {
+    // Print the request being waited on
+    IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+        "%s > rank %i %s>> Wait reached (Req waiting) async read @ %.8f s, (Request: %ld)\n", caller, rank,
+        GREEN, MPI_Wtime() - t_0, request);
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
-    {
-        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0);
+    {   
+        // Print an error message if start time is larger than end time
+        double req_end_time = MPI_Wtime() - t_0;
+        if (req_end_time < t_async_read_start) {
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+                "%s > rank %i %s>>>> Warning: Async read required end time %.8f s is smaller than start time %.8f s %s\n", caller, rank, RED, req_end_time, t_async_read_start, BLACK);
+            req_end_time = t_async_read_start; // set end time to start time to avoid negative durations
+        }
 
-        IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
+        p_ar->Phase_End_Req(size_async_read, t_async_read_start, req_end_time);
+
+        IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
             "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
     }
     Overhead_End();
@@ -908,8 +923,12 @@ void IOtraceBase<Tag>::Replace_Test(void)
 // Explicit instantiation for MPI_Tag
 template class IOtraceBase<MPI_Tag>;
 
+#if ENABLE_LIBC_TRACE == 1
 // Explicit instantiation for Libc_Tag
 template class IOtraceBase<Libc_Tag>;
+#endif // ENABLE_LIBC_TRACE
 
+#if ENABLE_IOURING_TRACE == 1
 // Explicit instantiation for IOuring_Tag
 template class IOtraceBase<IOuring_Tag>;
+#endif // ENABLE_IOURING_TRACE

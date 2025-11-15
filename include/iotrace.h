@@ -6,13 +6,17 @@
 #include <mutex>
 #include <cstdarg>
 #include <atomic>
-#include <liburing.h>
 #include <unordered_map>
 #include <thread>
 #include <condition_variable>
 #include <vector>
 #include <cassert>
 #include <unordered_set>
+
+#include "ioflags.h"
+#if ENABLE_IOURING_TRACE == 1
+#include <liburing.h>
+#endif // ENABLE_IOURING_TRACE
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -49,6 +53,7 @@ struct IOtraceTraits<MPI_Tag>
 	static constexpr const char *Name = "MPI";
 };
 
+#if ENABLE_LIBC_TRACE == 1
 struct Libc_Tag
 {
 };
@@ -60,7 +65,9 @@ struct IOtraceTraits<Libc_Tag>
 
 	static constexpr const char *Name = "Libc";
 };
+#endif // ENABLE_LIBC_TRACE
 
+#if ENABLE_IOURING_TRACE == 1
 struct IOuring_Tag
 {
 };
@@ -75,6 +82,7 @@ struct IOtraceTraits<IOuring_Tag>
 
 	static constexpr const char *Name = "IOuring";
 };
+#endif // ENABLE_IOURING_TRACE
 
 template <typename Tag>
 class IOtraceBase
@@ -298,6 +306,7 @@ public:
 	void Read_Sync_End(void);
 };
 
+#if ENABLE_LIBC_TRACE == 1
 class IOtraceLibc final : public IOtraceBase<Libc_Tag>
 {
 private:
@@ -338,7 +347,9 @@ public:
 	void Read_Sync_End(void);
 	void Batch_Read_Sync_End();
 };
+#endif // ENABLE_LIBC_TRACE
 
+#if ENABLE_IOURING_TRACE == 1
 class IOtraceIOuring final : public IOtraceBase<IOuring_Tag>
 {
 public:
@@ -471,5 +482,6 @@ private:
     void Read_Async_End(RequestIDType requestID, int status);
     void Read_Async_Required(RequestIDType requestID);
 };
+#endif // ENABLE_IOURING_TRACE
 
 #endif // IOTRACE_H

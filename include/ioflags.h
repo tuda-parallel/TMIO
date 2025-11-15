@@ -32,7 +32,7 @@
 #endif
 
 #ifndef IOTRACE_VERBOSE
-#define IOTRACE_VERBOSE 1 //set debug level for iodata.cxx
+#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 enum class VerbosityLevel {
     NONE_LOG = 0,   // No logging
     BASIC_LOG = 1,  // Basic information
@@ -125,7 +125,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 3
+#define FUNCTION_INFO 0
 // 0: No function tracing
 // 1: Directly print the function tracing to stdout
 // 2: Enhanced function tracing, which includes:
