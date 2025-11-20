@@ -298,7 +298,7 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
     p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset);
 
     // save request flag and set request counter (required and actual to one)
-    async_write_request.push_back(requestID);
+    async_write_request.push_back(AsyncRequest<Tag>(requestID));
     async_write_queue_req.push_back(1);
     async_write_queue_act.push_back(1);
 
@@ -385,7 +385,7 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
     p_ar->Phase_Start(async_read_request.empty(), async_read_time.back(), async_read_size.back(), offset);
 
     // save request flag and set request counter (required and actual to one)
-    async_read_request.push_back(requestID);
+    async_read_request.push_back(AsyncRequest<Tag>(requestID));
     async_read_queue_req.push_back(1);
     async_read_queue_act.push_back(1);
 
@@ -626,7 +626,7 @@ bool IOtraceBase<Tag>::
     {
         for (unsigned int i = 0; i < async_write_request.size(); i++)
         {
-            if (async_write_request[i] == request)
+            if (async_write_request[i].check_request(request))
             {
                 if (mode == 1)
                 {
@@ -685,7 +685,7 @@ bool IOtraceBase<Tag>::Check_Request_Read(RequestIDType request, double *start_t
     {
         for (unsigned int i = 0; i < async_read_request.size(); i++)
         {
-            if (async_read_request[i] == request)
+            if (async_read_request[i].check_request(request))
             {
                 if (mode == 1)
                 {

@@ -12,8 +12,8 @@
 #include <vector>
 #include <cassert>
 #include <unordered_set>
-
 #include "ioflags.h"
+
 #if ENABLE_IOURING_TRACE == 1
 #include <liburing.h>
 #endif // ENABLE_IOURING_TRACE
@@ -23,66 +23,13 @@
 #else
 #include "ioanalysis.h"
 #endif
-
+#include "iotrace_traits.h"
 /**
  *  IO trace class
  * @file   iotrace.h
  * @author Ahmad Tarraf
  * @date   05.08.2021
  */
-
-// * @brief Dynamic tag dispatching of IOtrace
-// * @details This is a template class that uses a tag to determine the type of IOtrace to use.
-// * The tag can be either MPI_Tag or Libc_Tag, which correspond to MPI I/O and libc I/O respectively.
-// * The IOtraceBase class is a template class that provides the base functionality for both MPI and libc I/O tracing.
-// * The IOtraceMPI and IOtraceLibc classes inherit from IOtraceBase and provide the specific implementation for each type of I/O.
-// * The IOtraceTraits class is a template specialization that provides the appropriate RequestType for each tag.
-// ! NOTE: Add explicit specialization (in the end of `iotrace_base.cxx`) for each tag to avoid linker errors.
-template <typename T>
-struct IOtraceTraits;
-
-struct MPI_Tag
-{
-};
-template <>
-struct IOtraceTraits<MPI_Tag>
-{
-	using RequestType = MPI_Request;
-	using RequestIDType = MPI_Request *;
-
-	static constexpr const char *Name = "MPI";
-};
-
-#if ENABLE_LIBC_TRACE == 1
-struct Libc_Tag
-{
-};
-template <>
-struct IOtraceTraits<Libc_Tag>
-{
-	using RequestType = const struct aiocb;
-	using RequestIDType = const struct aiocb *;
-
-	static constexpr const char *Name = "Libc";
-};
-#endif // ENABLE_LIBC_TRACE
-
-#if ENABLE_IOURING_TRACE == 1
-struct IOuring_Tag
-{
-};
-template <>
-struct IOtraceTraits<IOuring_Tag>
-{
-	using RequestType = __u64; 
-	// Though lib_uring uses void* as user_data in io_uring_sqe_set_data and io_uring_cqe_get_data
-	// But for `struct io_uring_sqe`, the type of user_data is defined as __u64, 
-	// so we use __u64 here to avoid casting issues.
-	using RequestIDType = __u64; 
-
-	static constexpr const char *Name = "IOuring";
-};
-#endif // ENABLE_IOURING_TRACE
 
 template <typename Tag>
 class IOtraceBase
@@ -154,14 +101,14 @@ protected:
 	std::vector<long long> async_write_size;
 	std::vector<int> async_write_queue_req;
 	std::vector<int> async_write_queue_act;
-	std::vector<RequestIDType> async_write_request;
+	std::vector<AsyncRequest<Tag>> async_write_request;
 	mutable std::shared_mutex async_write_vecs_lock; // Read-write lock for async write fields
 
 	std::vector<double> async_read_time;
 	std::vector<long long> async_read_size;
 	std::vector<int> async_read_queue_req;
 	std::vector<int> async_read_queue_act;
-	std::vector<RequestIDType> async_read_request;
+	std::vector<AsyncRequest<Tag>> async_read_request;
 	mutable std::shared_mutex async_read_vecs_lock; // Read-write lock for async read fields
 
 	IOdata aw, ar, sw, sr;
