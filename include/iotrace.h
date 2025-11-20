@@ -101,14 +101,14 @@ protected:
 	std::vector<long long> async_write_size;
 	std::vector<int> async_write_queue_req;
 	std::vector<int> async_write_queue_act;
-	std::vector<AsyncRequest<Tag>> async_write_request;
+	std::vector<AsyncRequest<Tag>> async_write_requests;
 	mutable std::shared_mutex async_write_vecs_lock; // Read-write lock for async write fields
 
 	std::vector<double> async_read_time;
 	std::vector<long long> async_read_size;
 	std::vector<int> async_read_queue_req;
 	std::vector<int> async_read_queue_act;
-	std::vector<AsyncRequest<Tag>> async_read_request;
+	std::vector<AsyncRequest<Tag>> async_read_requests;
 	mutable std::shared_mutex async_read_vecs_lock; // Read-write lock for async read fields
 
 	IOdata aw, ar, sw, sr;
