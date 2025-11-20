@@ -29,6 +29,7 @@ For all the cases below, `tmio` first needs to be installed (see [Installation](
 ```sh
 git checkout v0.0.1 
 ```
+
 ### Modified MPICH:
 
 Download and install the modified MPICH from [[https://github.com/jfmunoz00/MPICH-IOBandwidth-Limitation]].
@@ -51,6 +52,10 @@ data
     └── HACC-IO
 
 ```
+The data contains the results, including the figures generated with [ioplot](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot). 
+
+> [!note]
+> Starting with version v.0.0.2, TMIO changed the default units to bytes rather than MB in the json and jsonl files. As the files here were generated with the old version (v0.0.1), the traces need to be converted with [convert_trace](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#convert_trace), which is available after installing [FTIO](https://github.com/tuda-parallel/FTIO). Afterwards, the latest version of [ioplot](https://github.com/tuda-parallel/FTIO/blob/main/docs/tools.md#ioplot) can be used. Alternatively, an earlier version of ioplot needs to be used (before https://github.com/tuda-parallel/FTIO/commit/95cba20b4ac85f3a9b26155d9f0ce5b72e4c94e8). 
 
 ## Artifacts
 

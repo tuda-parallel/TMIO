@@ -19,6 +19,9 @@
 #include <zmq.hpp>
 #endif
 
+
+
+
 namespace iohf{
 
 double Median(double [],int);
@@ -93,6 +96,3 @@ void Function_Debug(std::string);
 #define BLUE    ""
 #define CYAN    ""
 #endif
-
-
-

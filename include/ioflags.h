@@ -24,7 +24,7 @@
 //* DEBUG Flags
 //*******************************
 #ifndef DEBUG 
-#define DEBUG 1 // set debug level for tmio.cxx
+#define DEBUG 0 // set debug level for tmio.cxx
 #endif
 
 #ifndef IODATA_VERBOSE
@@ -77,7 +77,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 // 2: 1 + prints act/req time when overlapping phases change (added or remove from stack) (t_overlap)
 // 3: 2 + prints phase bandwidth and throughput of all ranks (B_sum, B_avr,T_avr, T_sum) 
 // 4: 3 + prints start, act, and req time of phase bandwidth/throughput of all ranks (t_start and t_act for T_avr and t_start and t_req for B_sum)
-// 5: 4 + prints single I/O operaitons of every rank over all phases (all_b all_t_req_s all_t_req_e and all_t, all_t_act_s, all_t_act_e)
+// 5: 4 + prints single I/O operations of every rank over all phases (all_b all_t_req_s all_t_req_e and all_t, all_t_act_s, all_t_act_e)
 #endif
 
 
