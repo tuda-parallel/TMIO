@@ -68,8 +68,9 @@ namespace
 // ===================================================================================
 
 IOtraceIOuring::IOtraceIOuring()
-    : keep_polling_(true),
-      staged_requests_queue_(1024) // Size must be a power of two
+    : staged_requests_queue_(1024), // Size must be a power of two
+    keep_polling_(true)
+      
 {
     polling_thread_ = std::thread(&IOtraceIOuring::polling_loop, this);
 }

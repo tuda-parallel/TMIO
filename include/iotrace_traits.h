@@ -35,8 +35,8 @@ struct Libc_Tag
 template <>
 struct IOtraceTraits<Libc_Tag>
 {
-    using RequestType = const struct aiocb;
-    using RequestIDType = const struct aiocb *;
+    using RequestType = struct aiocb;
+    using RequestIDType = struct aiocb *;
     static constexpr const char *Name = "Libc";
 };
 
