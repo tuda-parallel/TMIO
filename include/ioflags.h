@@ -16,7 +16,7 @@
 #endif
 
 #ifndef ENABLE_IOURING_TRACE
-#define ENABLE_IOURING_TRACE 1 // set to 1 to enable tracing
+#define ENABLE_IOURING_TRACE 0 // set to 1 to enable tracing
 // 0: disable tracing
 // 1: enable tracing
 #endif

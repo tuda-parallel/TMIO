@@ -193,11 +193,6 @@ void IOdata::Phase_End_Req(long long b, double ts, double te)
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
-    // Print Debug info for bandwidth sum, when it is negative, also with the function name
-    if (bandwidth_req.back() < 0)
-    {
-        printf("Debug Info: Rank %d in Phase %ld has negative bandwidth for required I/O operation: %f in function %s\n", rank, phase_data.size(), bandwidth_req.back(), __PRETTY_FUNCTION__);
-    }
     phase_data.back().B_sum  += bandwidth_req.back();    
 
 #if IODATA_VERBOSE >= 3

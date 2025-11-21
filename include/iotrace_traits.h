@@ -6,8 +6,10 @@
 // Include necessary headers for the types used in specializations
 #include <mpi.h>
 #include <aio.h>
+#if ENABLE_IOURING_TRACE == 1
 #include <liburing.h>
-
+#endif // ENABLE_IOURING_TRACE
+#include <linux/types.h>
 // * @brief Dynamic tag dispatching of IOtrace
 // * @details This is a template class that uses a tag to determine the type of IOtrace to use.
 // ! NOTE: Add explicit specialization (in the end of `iotrace_base.cxx`) for each tag to avoid linker errors.
