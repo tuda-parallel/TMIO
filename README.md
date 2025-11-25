@@ -56,19 +56,23 @@ The obtained traces can be analyzed as explained here [exploring the traces](#ex
   </ol>
 </details>
 
-see latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tree/main/ChangeLog.md)
+See latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tree/main/ChangeLog.md)
 
 ## Getting Started
 ### Prerequisites
 - MPI
-- MsgPack (installed automatically see [Installation](#installation))
+- MsgPack (installed automatically, see [Installation](#installation))
 
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Installation
+First clone the github repo:
+```sh
+git clone https://github.com/tuda-parallel/TMIO.git
+```
 Go to the build directory:
 ```sh
-cd build
+cd TMIO/build
 ```
 Build the library using the Makefile.
 The library can be built with or without MessagePack:
