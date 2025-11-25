@@ -128,7 +128,7 @@ void IOdata::Clear_IO(void)
  * phase is indicated by \e Act_Done. 
  */
 void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
-{
+{ 
     //if first time, start phase
     if (condition)
     {
@@ -220,7 +220,6 @@ void IOdata::Phase_End_Req(long long b, double ts, double te)
 void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_condition)
 {
 
-    
     // if ONLINE == 1, calculate phase bandwidth
     if (phase_condition)
     {

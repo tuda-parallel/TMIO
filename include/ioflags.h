@@ -1,7 +1,25 @@
 #ifndef IOFLAGS 
 #define IOFLAGS
 
+//* ENABLE TRACING
+//*******************************
+#ifndef ENABLE_MPI_TRACE
+#define ENABLE_MPI_TRACE 1 // set to 1 to enable tracing
+// 0: disable tracing
+// 1: enable tracing
+#endif
 
+#ifndef ENABLE_LIBC_TRACE
+#define ENABLE_LIBC_TRACE 1 // set to 1 to enable tracing
+// 0: disable tracing
+// 1: enable tracing
+#endif
+
+#ifndef ENABLE_IOURING_TRACE
+#define ENABLE_IOURING_TRACE 0 // set to 1 to enable tracing
+// 0: disable tracing
+// 1: enable tracing
+#endif
 
 //* DEBUG Flags
 //*******************************
@@ -15,6 +33,15 @@
 
 #ifndef IOTRACE_VERBOSE
 #define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
+enum class VerbosityLevel {
+    NONE_LOG = 0,   // No logging
+    BASIC_LOG = 1,  // Basic information
+    DETAILED_LOG = 2, // More detailed information
+    DEBUG_LOG = 3,  // Debug-level information
+    TRACE_LOG = 4   // Very verbose, trace-level information
+};
+
+constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
 
 #ifndef IOANALYSIS_VERBOSE
@@ -98,7 +125,15 @@
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 0 // shows which function is called
+#define FUNCTION_INFO 0
+// 0: No function tracing
+// 1: Directly print the function tracing to stdout
+// 2: Enhanced function tracing, which includes:
+//    - Process ID and thread ID
+//    - Some Function with also shows parameters
+//    - Process-safe function tracing (i.e. clasified base on Rank)
+//    - Print after TMIO running time profile is finished (i.e. after MPI_Finalize())
+// 3: Main thread function tracing, which base on INFO level 2, while only printing the main thread function tracing
 #endif
 
 #ifndef OVERHEAD
@@ -205,6 +240,20 @@
 #define COLOR_OUTPUT 
 
 
+// * Batch IO Settings
+#ifndef BATCH_LIO
+#define BATCH_LIO 1
+// 0: Track each sync IO operation separately
+// 1: Batch all IO operations when call `lio_listio` with `LIO_WAIT` model
+#endif
+
+// * IO Before main() function
+//*******************************
+#ifndef IO_BEFORE_MAIN
+#define IO_BEFORE_MAIN 0
+// 0: No record IO before main function
+// 1: Record IO before main function
+#endif
 
 
 #endif
