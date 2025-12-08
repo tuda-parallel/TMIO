@@ -9,7 +9,9 @@
 #include <aio.h>
 
 #ifdef __linux__
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE // For preadv2, must be defined before including any headers
+#endif
 #include <sys/uio.h>
 #endif
 

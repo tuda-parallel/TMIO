@@ -321,7 +321,8 @@ namespace ioprint
 		sprintf(out[counter++], "| %s| %s|%s Harmonic mean overlapping throughput    : %.3f MB/s\n", GREEN, BLUE, BLACK, write_sync.throughput.app_metric.sum.hmean / 1'000'000);
 #endif
 #endif
-		sprintf(out[counter++], "\n");
+		// sprintf(out[counter++], "\n");
+		snprintf(out[counter++], sizeof(out[counter-1]), "\n");
 
 		// std::cout << "counter:" << counter <<"  values:"<< values << std::endl;
 

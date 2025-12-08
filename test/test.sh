@@ -1,34 +1,58 @@
 #!/bin/bash
 
 GIT_REPO=$(readlink -f ..)
+cd "$GIT_REPO/build" || exit 1
+
+# Colors
 BLACK="\033[0m"
 GREEN="\033[1;32m"
-YELLOW="\033[1;33m"
 RED="\033[1;31m"
-BLUE="\033[1;34m"
-CYAN="\033[1;36m"
 
-cd ${GIT_REPO}/build
+# Array to store failed tests
+FAILED_TESTS=()
 
+# Function to run a test and report result
+run_test() {
+    local num="$1"
+    local target="$2"
 
-# standard test
-(make clean 1>/dev/null && echo -e "${GREEN}passed test (0/10): clean${BLACK}") || echo -e "${RED}failed test (0/10): clean${BLACK}"
-(make build 1>/dev/null && echo -e "${GREEN}passed test (1/10): build${BLACK}") || echo -e "${RED}failed test (1/10): build${BLACK}"
-(make run 1>/dev/null && echo -e "${GREEN}passed test (2/10): run${BLACK}")     || echo -e "${RED}failed test (2/10): run${BLACK}"
-(make msgpack 1>/dev/null && echo -e "${GREEN}passed test (3/10): msgpack${BLACK}") || echo -e "${RED}failed test (3/10): msgpack${BLACK}"
+    if make "$target" 1>/dev/null; then
+        echo -e "${GREEN}passed test (${num}/10): ${target}${BLACK}"
+    else
+        echo -e "${RED}failed test (${num}/10): ${target}${BLACK}"
+        FAILED_TESTS+=("$target")
+    fi
+}
 
-# library test
+# Standard tests
+run_test 0 clean
+run_test 1 build
+run_test 2 run
+run_test 3 msgpack
+
+# Library tests
 make clean
-(make library 1>/dev/null && echo -e "${GREEN}passed test (4/10): library${BLACK}") || echo -e "${RED}failed test (4/10): library${BLACK}"
-(make msgpack_library 1>/dev/null && echo -e "${GREEN}passed test (5/10): msgpack_library${BLACK}") || echo -e "${RED}failed test (5/10): msgpack_library${BLACK}"
+run_test 4 library
+run_test 5 msgpack_library
 
-# special tetst
-(make debug 1>/dev/null  && echo -e "${GREEN}passed test (6/10): debug${BLACK}")   ||  echo -e "${RED}failed test (6/10): debug${BLACK}"
-(make dhat 1>/dev/null && echo -e "${GREEN}passed test (7/10): dhat${BLACK}")      || echo -e "${RED}failed test (7/10): dhat${BLACK}"
-(make memory_overhead 1>/dev/null && echo -e "${GREEN}passed test (8/10): memory_overhead${BLACK}") || echo -e "${RED}failed test (8/10): memory_overhead${BLACK}"
-(make openmp 1>/dev/null && echo -e "${GREEN}passed test (9/10): openmp${BLACK}") ||  echo -e "${RED}failed test (9/10): openmp${BLACK}"
+# Special tests
+run_test 6 debug
+run_test 7 dhat
+run_test 8 memory_overhead
+run_test 9 openmp
 
-# python tools
-(make tools 1>/dev/null && echo -e "${GREEN}passed test (10/10): tools${BLACK}")   || echo -e "${RED}failed test (10/10): tools${BLACK}"
+# Python tools
+run_test 10 tools
 
+# Clean up
 make clean
+
+# Summary
+if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
+    echo -e "${GREEN}All tests passed!${BLACK}"
+else
+    echo -e "${RED}Failed tests summary:${BLACK}"
+    for t in "${FAILED_TESTS[@]}"; do
+        echo -e "  - $t"
+    done
+fi
