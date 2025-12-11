@@ -59,8 +59,9 @@ int MPI_Finalize()
 int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info, MPI_File *fh)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Open();
-	return PMPI_File_open(comm, filename, amode, info, fh);
+	int ret = PMPI_File_open(comm, filename, amode, info, fh);
+	mpi_iotrace.Open(filename, *fh);
+	return ret;
 }
 
 //**********************************************************************
@@ -69,7 +70,7 @@ int MPI_File_open(MPI_Comm comm, const char *filename, int amode, MPI_Info info,
 int MPI_File_close(MPI_File *fh)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Close();
+	mpi_iotrace.Close(*fh);
 	return PMPI_File_close(fh);
 }
 
@@ -81,6 +82,9 @@ int MPI_File_close(MPI_File *fh)
 int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, true);
+#endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite(fh, buf, count, datatype, request);
 }
@@ -91,6 +95,9 @@ int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype dataty
 int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, true);
+#endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request, offset);
 	return PMPI_File_iwrite_at(fh, offset, buf, count, datatype, request);
 }
@@ -121,7 +128,9 @@ int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int 
 int MPI_File_iwrite_shared(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, true);
+#endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite_shared(fh, buf, count, datatype, request);
 }
@@ -196,6 +205,9 @@ int MPI_File_write_shared(MPI_File fh, const void *buf, int count, MPI_Datatype 
 int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, false);
+#endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread(fh, buf, count, datatype, request);
 }
@@ -206,6 +218,9 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, false);
+#endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_at(fh, offset, buf, count, datatype, request);
 }
@@ -236,7 +251,9 @@ int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, 
 int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-
+#if defined BW_LIMIT
+	mpi_iotrace.Apply_Limit(fh, true);
+#endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_shared(fh, buf, count, datatype, request);
 }
@@ -316,11 +333,9 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status)
 	int result = PMPI_Wait(request, status);
 	mpi_iotrace.Write_Async_End(request);
 	mpi_iotrace.Read_Async_End(request);
-#if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit();
-#elif defined CUSTOM_MPI
-	mpi_iotrace.Replace_Test();
-#endif
+	#if defined CUSTOM_MPI || defined BW_LIMIT
+		mpi_iotrace.Set_Custom_Throughput();
+	#endif 
 	return result;
 }
 
@@ -341,11 +356,9 @@ int MPI_Waitall(int count, MPI_Request requests[], MPI_Status statuses[])
 		mpi_iotrace.Write_Async_End(requests + i);
 		mpi_iotrace.Read_Async_End(requests + i);
 	}
-#if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit();
-#elif defined CUSTOM_MPI
-	mpi_iotrace.Replace_Test();
-#endif
+	#if defined CUSTOM_MPI || defined BW_LIMIT
+		mpi_iotrace.Set_Custom_Throughput();
+	#endif 
 	return result;
 }
 

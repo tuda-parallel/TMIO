@@ -1,3 +1,6 @@
+#ifndef IO_ANALYSIS_H
+#define IO_ANALYSIS_H
+
 #include "iodata.h"
 // #include <complex>
 
@@ -23,3 +26,5 @@ namespace ioanalysis
 	int *Get_N_From_ALL_N(IOdata *, n_struct *, int, int);
 
 }
+
+#endif // IO_ANALYSIS_H

@@ -23,6 +23,14 @@
 
 //* DEBUG Flags
 //*******************************
+enum class VerbosityLevel {
+    NONE_LOG = 0,   // No logging
+    BASIC_LOG = 1,  // Basic information
+    DETAILED_LOG = 2, // More detailed information
+    DEBUG_LOG = 3,  // Debug-level information
+    TRACE_LOG = 4   // Very verbose, trace-level information
+};
+
 #ifndef DEBUG 
 #define DEBUG 1 // set debug level for tmio.cxx
 #endif
@@ -33,14 +41,6 @@
 
 #ifndef IOTRACE_VERBOSE
 #define IOTRACE_VERBOSE 1 //set debug level for iodata.cxx
-enum class VerbosityLevel {
-    NONE_LOG = 0,   // No logging
-    BASIC_LOG = 1,  // Basic information
-    DETAILED_LOG = 2, // More detailed information
-    DEBUG_LOG = 3,  // Debug-level information
-    TRACE_LOG = 4   // Very verbose, trace-level information
-};
-
 constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
 
@@ -57,7 +57,8 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef BW_LIMIT_VERBOSE
-#define BW_LIMIT_VERBOSE 0 //controls debug of bw_limit in  bw_limit.cxx
+#define BW_LIMIT_VERBOSE 1 //controls debug of bw_limit in  bw_limit.cxx
+constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 #endif
 
 // #define TIME_VERBOSE  //Trace time of rank 0 
@@ -213,6 +214,14 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 // Tolerance value to scale the desired values
 #ifndef TOL
 #define TOL 1.1
+#endif
+// Limit bandwidth based on previous transfers for this file
+#ifndef BW_FILE_SPECIFIC
+#define BW_FILE_SPECIFIC 1
+#endif
+// Limit baandwidth based on file size difference
+#ifndef BW_FILE_SCALING
+#define BW_FILE_SCALING 1
 #endif
 #endif
 

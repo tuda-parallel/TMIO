@@ -104,7 +104,7 @@ int TMIO_DECL(open)(const char *path, int flags, ...)
 		ret = __real_open(path, flags);
 	}
 
-	get_libc_iotrace().Open();
+	get_libc_iotrace().Open(path, ret);
 	return (ret);
 }
 
@@ -117,7 +117,7 @@ int TMIO_DECL(__open_2)(const char *path, int oflag)
 
 	ret = __real_open(path, oflag);
 
-	get_libc_iotrace().Open();
+	get_libc_iotrace().Open(path, ret);
 
 	return (ret);
 }
@@ -144,7 +144,7 @@ int TMIO_DECL(open64)(const char *path, int flags, ...)
 		ret = __real_open64(path, flags);
 	}
 
-	get_libc_iotrace().Open();
+	get_libc_iotrace().Open(path, ret);
 	return (ret);
 }
 
@@ -170,7 +170,7 @@ int TMIO_DECL(openat)(int dirfd, const char *pathname, int flags, ...)
 		ret = __real_openat(dirfd, pathname, flags);
 	}
 
-	get_libc_iotrace().Open();
+	get_libc_iotrace().Open(pathname, ret);
 	return (ret);
 }
 
@@ -196,7 +196,7 @@ int TMIO_DECL(openat64)(int dirfd, const char *pathname, int flags, ...)
 		ret = __real_openat64(dirfd, pathname, flags);
 	}
 
-	get_libc_iotrace().Open();
+	get_libc_iotrace().Open(pathname, ret);
 	return (ret);
 }
 
@@ -209,7 +209,7 @@ int TMIO_DECL(close)(int fd)
 
 	ret = __real_close(fd);
 
-	get_libc_iotrace().Close();
+	get_libc_iotrace().Close(fd);
 
 	// std::cout << "TMIO > close(" << fd << ")" << std::endl;
 

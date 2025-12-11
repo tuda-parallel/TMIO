@@ -39,14 +39,20 @@ void IOdata::Mode(int r, bool a, bool b)
  * @param b           [in] number of bytes transfered
  * @param ts          [in] start time of I/O operation
  * @param te          [in] end time of I/O operation
+ * @param path        [in] file this I/O operation belongs to
  *
  * @details Adds IO operation to tracked data
  */
-void IOdata::Add_Io(bool req_or_act, long long b, double ts, double te)
+void IOdata::Add_Io(bool req_or_act, long long b, double ts, double te, std::filesystem::path path)
 {
 
     if (req_or_act)
     {
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+        if (!path.empty()) {
+            path_to_io_req.try_emplace(std::move(path)).first->second.push_back(bandwidth_req.size());
+        }
+#endif
 #if SAME_T_END == 1
         bandwidth_req.push_back(b / (phase_data.back().t_end_req - ts));
 #else
@@ -79,6 +85,11 @@ void IOdata::Add_Io(bool req_or_act, long long b, double ts, double te)
     }
     else
     {
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+        if (!path.empty()) {
+             path_to_io_act.try_emplace(std::move(path)).first->second.push_back(bandwidth_act.size());
+        }
+#endif
         bandwidth_act.push_back(b / (te - ts));
 #if ALL_SAMPLES > 4
         t_act_s.push_back(ts);
@@ -111,6 +122,10 @@ void IOdata::Clear_IO(void)
     t_req_e.clear();
     phases.clear();
     phase_data.clear();
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+    path_to_io_req.clear();
+    path_to_io_act.clear();
+#endif
 }
 
 
@@ -165,11 +180,12 @@ void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
  * @param b transferd bytes by I/O operation
  * @param ts start time of I/O operation 
  * @param te end time of I/O oeration
- *
+ * @param path file of the I/O operation
+ * 
  * @details \e Phase_Start_Req sets the flag \e phase to active during the first call. During the first call to this function 
  * the flag becomes false and the required phase ends. 
  */
-void IOdata::Phase_End_Req(long long b, double ts, double te)
+void IOdata::Phase_End_Req(long long b, double ts, double te, std::filesystem::path path)
 {
     //TODO: add flag to control granualaierty of sampling. Individual I/O operation can be discarded if focus is on phase (remove vectors)
     if (phase){
@@ -189,7 +205,7 @@ void IOdata::Phase_End_Req(long long b, double ts, double te)
     }
 
     // add required values to tracked data
-    Add_Io(1, b, ts, te);
+    Add_Io(1, b, ts, te, path);
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
@@ -216,8 +232,9 @@ void IOdata::Phase_End_Req(long long b, double ts, double te)
  * @param ts start time of I/O operation    
  * @param te end time of I/O operation
  * @param phase_condition condition indicating that the actual phase is over
+ * @param path path of the file this I/O operation belongs to
  */
-void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_condition)
+void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_condition, std::filesystem::path path)
 {
 
     // [NOTE] Only true when all the Async I/O operations belong to this phase are over
@@ -242,7 +259,7 @@ void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_conditi
     
     //TODO: flag to contol granualrtiy of sampling
     //add actual values to tracked data
-    Add_Io(0, b, ts, te);
+    Add_Io(0, b, ts, te, path);
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
@@ -323,6 +340,19 @@ T IOdata::Max(std::vector<T> a)
     return max;
 }
 template long long IOdata::Max<long long>(std::vector<long long>);
+
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+double IOdata::Get_Prev_File_BW(std::filesystem::path path)
+{
+    double res = -1.0;
+    auto it = path_to_io_req.find(path);
+    if (it != path_to_io_req.end()) {
+        size_t index = it->second.back();
+        res = bandwidth_req[index];
+    }
+    return res;
+}
+#endif
 
 long long IOdata::count_opertaions(long long a)
 {

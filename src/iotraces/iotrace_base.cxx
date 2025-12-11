@@ -326,10 +326,14 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         //  first time the status of the actual write is quarried. Solves the problem of several MPI_Test
         if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 2))
         {
+            std::filesystem::path path;
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+            path = file_tracker.get_request_path(request);
+#endif
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
             // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_request.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
-            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
+            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0), path);
 
             IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
                                                                           {
@@ -356,7 +360,11 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
-        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0);
+        std::filesystem::path path;
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+        path = file_tracker.get_request_path(request);
+#endif
+        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, path);
 
         IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
                                                                       {
@@ -414,6 +422,10 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
         //  first time the status of the actual read is quarried. Solves the problem of several MPI_Test
         if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 2))
         {
+            std::filesystem::path path;
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+            path = file_tracker.get_request_path(request);
+#endif
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
             // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0,(async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
@@ -442,7 +454,11 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
-        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0);
+        std::filesystem::path path;
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+        path = file_tracker.get_request_path(request);
+#endif
+        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, path);
 
         IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
             "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);
@@ -551,9 +567,15 @@ void IOtraceBase<Tag>::Read_Sync_End_Impl(void)
 //*                               1. Open
 //************************************************************************************
 template <typename Tag>
-void IOtraceBase<Tag>::Open(void)
+void IOtraceBase<Tag>::Open(const char *path, const FDType fd)
 {
     open = 1;
+
+#if defined(BW_LIMIT) && BW_FILE_SPECIFIC == 1
+    Overhead_Start(MPI_Wtime() - t_0);
+    file_tracker.track_file_opened(path, fd);
+    Overhead_End();
+#endif
 
 #if SYNC_MODE == 1
     p_sw->flag = true;
@@ -569,12 +591,19 @@ void IOtraceBase<Tag>::Open(void)
 //*                               2. Close
 //************************************************************************************
 template <typename Tag>
-void IOtraceBase<Tag>::Close(void)
+void IOtraceBase<Tag>::Close(const FDType fd)
 {
 
     if (open == 1)
     {
         open = 0;
+
+#if defined(BW_LIMIT) && BW_FILE_SPECIFIC == 1
+        Overhead_Start(MPI_Wtime() - t_0);
+        file_tracker.track_file_closed(fd);
+        Overhead_End();
+#endif
+
 #if SYNC_MODE == 1
         p_sw->Phase_End_Sync(t_sync_write_end);
         p_sr->Phase_End_Sync(t_sync_read_end);
@@ -883,21 +912,25 @@ void IOtraceBase<Tag>::Set(std::string flag, bool value)
 
 #ifdef BW_LIMIT
 template <typename Tag>
-void IOtraceBase<Tag>::Apply_Limit(void)
+void IOtraceBase<Tag>::Apply_Limit(FDType fd, bool write)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    bw_limit.Limit_Async();
+    std::filesystem::path path;
+#if BW_FILE_SPECIFIC == 1
+    path = file_tracker.get_fd_path(fd);
+#endif
+    bw_limit.Limit_Async(path, write);
     Overhead_End();
 }
 #endif
 
 //! ##### modify T and duration in case custom MPI version
 //************************************************************************************
-//*                    Replace values from MPI_Test*
+//*                    Set custom MPI throughput values
 //************************************************************************************
-#ifdef CUSTOM_MPI
+#if defined CUSTOM_MPI || defined BW_LIMIT
 template <typename Tag>
-void IOtraceBase<Tag>::Replace_Test(void)
+void IOtraceBase<Tag>::Set_Custom_Throughput(void)
 {
     Overhead_Start(MPI_Wtime() - t_0);
     bw_limit.Set_Throughput();

@@ -2,6 +2,7 @@
 #define IOTRACE_H
 
 #include "tmio_helper_functions.h"
+#include "ioanalysis.h"
 #include <shared_mutex>
 #include <mutex>
 #include <cstdarg>
@@ -16,8 +17,6 @@
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
-#else
-#include "ioanalysis.h"
 #endif
 
 /**
@@ -45,6 +44,7 @@ struct IOtraceTraits<MPI_Tag>
 {
 	using RequestType = MPI_Request;
 	using RequestIDType = MPI_Request *;
+	using FDType = MPI_File;
 
 	static constexpr const char *Name = "MPI";
 };
@@ -57,6 +57,7 @@ struct IOtraceTraits<Libc_Tag>
 {
 	using RequestType = const struct aiocb;
 	using RequestIDType = const struct aiocb *;
+	using FDType = int;
 
 	static constexpr const char *Name = "Libc";
 };
@@ -72,6 +73,7 @@ struct IOtraceTraits<IOuring_Tag>
 	// But for `struct io_uring_sqe`, the type of user_data is defined as __u64, 
 	// so we use __u64 here to avoid casting issues.
 	using RequestIDType = __u64; 
+	using FDType = int;
 
 	static constexpr const char *Name = "IOuring";
 };
@@ -88,14 +90,15 @@ protected:
 public:
 	using RequestType = typename IOtraceTraits<Tag>::RequestType;
 	using RequestIDType = typename IOtraceTraits<Tag>::RequestIDType;
+	using FDType = typename IOtraceTraits<Tag>::FDType;
 
 	static constexpr const char *kLibName = IOtraceTraits<Tag>::Name;
 
 	// Mandatory for initialization of IOdata
 	void Init(void);
-	void Open(void);
+	void Open(const char *, FDType);
 	void Summary(void);
-	void Close(void);
+	void Close(const FDType);
 
 	int Get_Relevant_Ranks(MPI_File fh);
 
@@ -105,9 +108,10 @@ public:
 	void Set(std::string, bool);
 
 #if defined BW_LIMIT
-	void Apply_Limit(void);
-#elif defined CUSTOM_MPI
-	void Replace_Test(void);
+	void Apply_Limit(FDType, bool);
+#endif
+#if defined CUSTOM_MPI || defined BW_LIMIT
+	void Set_Custom_Throughput(void);
 #endif
 
 protected:
@@ -164,6 +168,10 @@ protected:
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 	Bw_limit bw_limit;
+
+#if BW_FILE_SPECIFIC == 1
+	FileTracker<FDType, RequestIDType> file_tracker;
+#endif
 #endif
 
 	char caller[12] = "\tIOtrace";

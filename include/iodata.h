@@ -1,5 +1,10 @@
+#ifndef IO_DATA_H
+#define IO_DATA_H
+
 #include <stdio.h>
 #include <string.h>
+#include <unordered_map>
+#include <filesystem>
 #include "ioprint.h"
 
 /**
@@ -21,6 +26,13 @@
 class IOdata{
 
 public: 
+    enum class Transaction_Type {
+        Async_Write,
+        Async_Read,
+        Sync_Write,
+        Sync_Read,
+    };
+
     //* Variables:
     //************
     int  rank;                // current rank
@@ -38,7 +50,10 @@ public:
     std:: vector<double>    t_req_s;  // required start time (usually same as t_act_s)
     std:: vector<double>    t_req_e;  // required end time
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-    
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io_req;   // keeps file information for each required I/O operation
+    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io_act;   // keeps file information for each actual I/O operation
+#endif
     //*******************************
     //* Phase information 
     //*******************************   
@@ -53,12 +68,12 @@ public:
     void Phase_Start(bool, double,long long,long long );
     
     //? add I/O tracr or claer all I/O traces
-    void Add_Io(bool,long long,double,double);
+    void Add_Io(bool,long long,double,double,std::filesystem::path = std::filesystem::path{});
     void Clear_IO(void);
     
     //? for Async tracing 
-    void Phase_End_Req(long long,double,double);
-    void Phase_End_Act(long long,double,double,bool);
+    void Phase_End_Req(long long,double,double,std::filesystem::path = std::filesystem::path{});
+    void Phase_End_Act(long long,double,double,bool,std::filesystem::path = std::filesystem::path{});
     
     //? for Sync tracing 
     void Phase_End_Sync(double);
@@ -68,6 +83,11 @@ public:
     T Sum(std::string);
     template <class T>
     T Max(std::vector<T>);
+
+#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+    double Get_Prev_File_BW(std::filesystem::path);
+    double Get_Prev_File_Size(std::filesystem::path);
+#endif
     
     //? calucalte the Bandwidth after the application finishes
     void Bandwidth_In_Phase_Offline(void);
@@ -84,3 +104,5 @@ private:
     long long count_opertaions_agg(long long);  //counts all operations bellow input
     long long online_counter;
 };
+
+#endif // IO_DATA_H
