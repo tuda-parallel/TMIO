@@ -8,10 +8,8 @@
 
 using Transaction_Type = IOdata::Transaction_Type;
 
-#if BW_FILE_SPECIFIC == 1
-
 template<typename FDType, typename RequestIDType>
-class FileTracker {
+class [[maybe_unused]] FileTracker {
 private:
 	std::map<FDType, std::filesystem::path> file_register;
 	std::map<RequestIDType, std::filesystem::path> request_register;
@@ -19,13 +17,11 @@ private:
 public:
 	void track_file_opened(const char*, const FDType);
 	void track_file_closed(const FDType);
-	std::filesystem::path get_fd_path(const FDType);
+	std::filesystem::path* get_fd_path(const FDType);
 	void register_request(const RequestIDType, const FDType);
-	std::filesystem::path get_request_path(const RequestIDType);
+	std::filesystem::path* get_request_path(const RequestIDType);
 	void unregister_request(const RequestIDType);
 };
-
-#endif // BW_FILE_SPECIFIC
 
 class Bw_limit
 {
@@ -83,7 +79,7 @@ public:
 	void Init(int, int, IOdata *, IOdata *, IOdata *, IOdata *);
 
 #if defined BW_LIMIT
-	void Limit_Async(std::filesystem::path, bool);
+	void Limit_Async(bool, const std::filesystem::path *, long long);
 #endif
 #if defined CUSTOM_MPI || BW_LIMIT
 	void Set_Throughput(void);

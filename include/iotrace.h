@@ -108,7 +108,7 @@ public:
 	void Set(std::string, bool);
 
 #if defined BW_LIMIT
-	void Apply_Limit(FDType, bool);
+	void Apply_Limit_Impl(bool, FDType, long long);
 #endif
 #if defined CUSTOM_MPI || defined BW_LIMIT
 	void Set_Custom_Throughput(void);
@@ -304,6 +304,13 @@ public:
 	void Read_Async_Required(MPI_Request *);
 	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
 	void Read_Sync_End(void);
+
+#ifdef BW_LIMIT
+	//*************************************
+	//* MPI limit bandwidth
+	//*************************************
+	void Apply_Limit(bool write, MPI_File fd, int count, MPI_Datatype datatype);
+#endif
 };
 
 class IOtraceLibc final : public IOtraceBase<Libc_Tag>

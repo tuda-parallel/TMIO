@@ -207,7 +207,7 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
  * @param path path to the accessed file
  * @param write true = write, false = read
  */
-void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
+void Bw_limit::Limit_Async(bool write, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size)
 {
 	// Async write
 	if (write)
@@ -217,7 +217,8 @@ void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
 		double measured_bw; 
 
 		if constexpr (BW_FILE_SPECIFIC == 1) {
-			measured_bw = p_aw->Get_Prev_File_BW(std::move(path));
+			if(path)
+				measured_bw = p_aw->Get_Prev_File_BW(*path);
 		} else {
 			measured_bw = Bw_limit::Get(Transaction_Type::Async_Write, "B_sum");
 		}
@@ -242,12 +243,19 @@ void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
 		EMPI_DATA_IWRITE = 0;
 		EMPI_UTIME_IWRITE = 0;
 		
+		double scale_factor = 1.0;
 		if constexpr (BW_FILE_SCALING == 1) {
-			
-		} else {
-			EMPI_SCALE_BW_IWRITE = 1.0;
+			if (path) {
+				long long prev_transaction_size = p_aw->Get_Prev_File_Size(*path);
+				scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
+
+				double scaled_limit = scale_factor * bw;
+
+				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync write %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
+			}
 		}
-		
+
+		EMPI_SCALE_BW_IWRITE = scale_factor;
 	} 
 	else // Async read
 	{
@@ -256,7 +264,8 @@ void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
 		double measured_bw;
 
 		if constexpr (BW_FILE_SPECIFIC == 1) {
-			measured_bw = p_ar->Get_Prev_File_BW(std::move(path));
+			if(path)
+				measured_bw = p_ar->Get_Prev_File_BW(*path);
 		} else {
 			measured_bw = Bw_limit::Get(Transaction_Type::Async_Read, "B_sum");
 		}
@@ -266,7 +275,7 @@ void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
 			return;
 		}
 
-		const auto bw = Get_BW_Limit(measured_bw, bw_limit_iread);
+		auto bw = Get_BW_Limit(measured_bw, bw_limit_iread);
 				
 		if (bw != bw_limit_iread) {
 			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> BW old goal: %.2f Mb/s   BW: %.2f (%.2f) Mb/s   BW new goal: %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, bw_limit_iread / 1'000'000, T / 1'000'000, T / 1'000'000, bw / 1'000'000, BLACK);
@@ -280,11 +289,19 @@ void Bw_limit::Limit_Async(std::filesystem::path path, bool write)
 		EMPI_UTIME_IREAD = 0;
 		EMPI_DATA_IREAD = 0;
 
+		double scale_factor = 1.0;
 		if constexpr (BW_FILE_SCALING == 1) {
-			
-		} else {
-			EMPI_SCALE_BW_IREAD = 1.0;
-		}
+			if (path) {
+				long long prev_transaction_size = p_ar->Get_Prev_File_Size(*path);
+				scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
+
+				double scaled_limit = scale_factor * bw;
+
+				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
+			}
+		} 
+
+		EMPI_SCALE_BW_IREAD = scale_factor;
 	}
 }
 
@@ -353,8 +370,6 @@ void Bw_limit::Set_Throughput(void)
 }
 #endif
 
-
-#if BW_FILE_SPECIFIC == 1
 template<typename FDType, typename RequestIDType>
 void FileTracker<FDType, RequestIDType>::track_file_opened(const char* path, const FDType fd)
 {
@@ -371,14 +386,13 @@ void FileTracker<FDType, RequestIDType>::track_file_closed(const FDType fd)
 }
 
 template<typename FDType, typename RequestIDType>
-std::filesystem::path FileTracker<FDType, RequestIDType>::get_fd_path(const FDType fd) 
+std::filesystem::path* FileTracker<FDType, RequestIDType>::get_fd_path(const FDType fd) 
 {
-	std::filesystem::path path;
 	auto it = file_register.find(fd);
 	if (it != file_register.end()) {
-		path = it->second();
+		return &it->second();
 	}
-	return path;
+	return nullptr;
 }
 
 template<typename FDType, typename RequestIDType>
@@ -392,14 +406,13 @@ void FileTracker<FDType, RequestIDType>::register_request(const RequestIDType re
 }
 
 template<typename FDType, typename RequestIDType>
-std::filesystem::path FileTracker<FDType, RequestIDType>::get_request_path(const RequestIDType request_id) 
+std::filesystem::path* FileTracker<FDType, RequestIDType>::get_request_path(const RequestIDType request_id) 
 {
-	std::filesystem::path path;
 	auto it = request_register.find(request_id);
 	if(it != request_register.end()) {
-		path = it->second();
+		return &it->second();
 	}
-	return path;
+	return nullptr;
 }
 
 template<typename FDType, typename RequestIDType>
@@ -411,4 +424,3 @@ void FileTracker<FDType, RequestIDType>::unregister_request(const RequestIDType 
 	}
 }
 
-#endif

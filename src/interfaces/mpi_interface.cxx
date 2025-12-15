@@ -83,7 +83,7 @@ int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype dataty
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, true);
+	mpi_iotrace.Apply_Limit(true, fh, count, datatype);
 #endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite(fh, buf, count, datatype, request);
@@ -96,7 +96,7 @@ int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int coun
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, true);
+	mpi_iotrace.Apply_Limit(true, fh, count, datatype);
 #endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request, offset);
 	return PMPI_File_iwrite_at(fh, offset, buf, count, datatype, request);
@@ -129,7 +129,7 @@ int MPI_File_iwrite_shared(MPI_File fh, const void *buf, int count, MPI_Datatype
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, true);
+	mpi_iotrace.Apply_Limit(true, fh, count, datatype);
 #endif
 	mpi_iotrace.Write_Async_Start(count, datatype, request);
 	return PMPI_File_iwrite_shared(fh, buf, count, datatype, request);
@@ -206,7 +206,7 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, false);
+	mpi_iotrace.Apply_Limit(false, fh, count, datatype);
 #endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread(fh, buf, count, datatype, request);
@@ -219,7 +219,7 @@ int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, false);
+	mpi_iotrace.Apply_Limit(false, fh, count, datatype);
 #endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_at(fh, offset, buf, count, datatype, request);
@@ -252,7 +252,7 @@ int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype dataty
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if defined BW_LIMIT
-	mpi_iotrace.Apply_Limit(fh, true);
+	mpi_iotrace.Apply_Limit(false, fh, count, datatype);
 #endif
 	mpi_iotrace.Read_Async_Start(count, datatype, request);
 	return PMPI_File_iread_shared(fh, buf, count, datatype, request);

@@ -279,7 +279,7 @@ void IOtraceLibc::Batch_Write_Sync_End()
         return;
     }
 
-    p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
+    p_sw->Add_IO_Act(size_sync_write, t_sync_write_start, t_sync_write_end);
 
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
@@ -387,7 +387,7 @@ void IOtraceLibc::Batch_Read_Sync_End()
         return;
     }
 
-    p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
+    p_sr->Add_IO_Act(size_sync_read, t_sync_read_start, t_sync_read_end);
 
 #if SYNC_MODE == 0
     p_sr->Phase_End_Sync(t_sync_read_end);

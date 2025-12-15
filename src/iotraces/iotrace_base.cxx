@@ -326,14 +326,11 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         //  first time the status of the actual write is quarried. Solves the problem of several MPI_Test
         if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 2))
         {
-            std::filesystem::path path;
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-            path = file_tracker.get_request_path(request);
-#endif
+
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
             // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_request.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
-            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0), path);
+            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
 
             IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
                                                                           {
@@ -360,7 +357,7 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
-        std::filesystem::path path;
+        std::filesystem::path* path = nullptr;
 #if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
         path = file_tracker.get_request_path(request);
 #endif
@@ -422,10 +419,6 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
         //  first time the status of the actual read is quarried. Solves the problem of several MPI_Test
         if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 2))
         {
-            std::filesystem::path path;
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-            path = file_tracker.get_request_path(request);
-#endif
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
             // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0,(async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
@@ -454,7 +447,7 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     Overhead_Start(MPI_Wtime() - t_0);
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
-        std::filesystem::path path;
+        std::filesystem::path* path = nullptr;
 #if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
         path = file_tracker.get_request_path(request);
 #endif
@@ -501,7 +494,7 @@ void IOtraceBase<Tag>::Write_Sync_End_Impl(void)
 {
     t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
-    p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
+    p_sw->Add_IO_Act(size_sync_write, t_sync_write_start, t_sync_write_end);
 
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
@@ -551,7 +544,7 @@ void IOtraceBase<Tag>::Read_Sync_End_Impl(void)
 {
     t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
 
-    p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
+    p_sr->Add_IO_Act(size_sync_read, t_sync_read_start, t_sync_read_end);
 
 #if SYNC_MODE == 0
     p_sr->Phase_End_Sync(t_sync_read_end);
@@ -912,14 +905,14 @@ void IOtraceBase<Tag>::Set(std::string flag, bool value)
 
 #ifdef BW_LIMIT
 template <typename Tag>
-void IOtraceBase<Tag>::Apply_Limit(FDType fd, bool write)
+void IOtraceBase<Tag>::Apply_Limit_Impl(bool write, FDType fd, long long transact_size)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    std::filesystem::path path;
+    std::filesystem::path* path = nullptr;
 #if BW_FILE_SPECIFIC == 1
     path = file_tracker.get_fd_path(fd);
 #endif
-    bw_limit.Limit_Async(path, write);
+    bw_limit.Limit_Async(write, path, transact_size);
     Overhead_End();
 }
 #endif

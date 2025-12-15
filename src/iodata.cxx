@@ -35,7 +35,6 @@ void IOdata::Mode(int r, bool a, bool b)
 /**
  * @brief collects individual I/O operations
  *
- * @param req_or_act  [in] 1 for required || 0 for actual
  * @param b           [in] number of bytes transfered
  * @param ts          [in] start time of I/O operation
  * @param te          [in] end time of I/O operation
@@ -43,70 +42,73 @@ void IOdata::Mode(int r, bool a, bool b)
  *
  * @details Adds IO operation to tracked data
  */
-void IOdata::Add_Io(bool req_or_act, long long b, double ts, double te, std::filesystem::path path)
+void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
 {
 
-    if (req_or_act)
-    {
 #if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-        if (!path.empty()) {
-            path_to_io_req.try_emplace(std::move(path)).first->second.push_back(bandwidth_req.size());
-        }
+    if (path) {
+        path_to_io.try_emplace(*path).first->second.push_back(bandwidth_req.size());
+    }
 #endif
 #if SAME_T_END == 1
-        bandwidth_req.push_back(b / (phase_data.back().t_end_req - ts));
+    bandwidth_req.push_back(b / (phase_data.back().t_end_req - ts));
 #else
-        bandwidth_req.push_back(b / (te - ts));
+    bandwidth_req.push_back(b / (te - ts));
 #endif
 
+    bytes.push_back(b);
+
 #if ALL_SAMPLES > 4
-        t_req_s.push_back(ts);
-        #if SAME_T_END == 1
-        t_req_e.push_back(phase_data.back().t_end_req );
-        #else
-        t_req_e.push_back(te);
-        #endif
+    t_req_s.push_back(ts);
+    #if SAME_T_END == 1
+    t_req_e.push_back(phase_data.back().t_end_req );
+    #else
+    t_req_e.push_back(te);
+    #endif
 #endif
 
 #if IODATA_VERBOSE >= 1
 #if SAME_T_END == 1
-        printf("%s > rank %i %s> %s %s phase %li > #%lli > req over: %.3f KB handled in %f s -> B(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, phase_data.back().t_end_req - ts, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_req.back() / 1000, BLACK);
+    printf("%s > rank %i %s> %s %s phase %li > #%lli > req over: %.3f KB handled in %f s -> B(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, phase_data.back().t_end_req - ts, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_req.back() / 1000, BLACK);
 #else
-        printf("%s > rank %i %s> %s %s phase %li > #%lli > req over: %.3f KB handled in %f s -> B(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, te - ts, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_req.back() / 1000, BLACK);
+    printf("%s > rank %i %s> %s %s phase %li > #%lli > req over: %.3f KB handled in %f s -> B(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, te - ts, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_req.back() / 1000, BLACK);
 #endif
 #endif
 #if IODATA_VERBOSE >= 2
 #if SAME_T_END == 1
-        printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), ts, phase_data.back().t_end_req, BLACK);
+    printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), ts, phase_data.back().t_end_req, BLACK);
 #else
-        printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), ts, te, BLACK);
+    printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_req.size() - count_opertaions_agg(phase_data.size() - 1), ts, te, BLACK);
 #endif
 #endif
-    }
-    else
-    {
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-        if (!path.empty()) {
-             path_to_io_act.try_emplace(std::move(path)).first->second.push_back(bandwidth_act.size());
-        }
-#endif
-        bandwidth_act.push_back(b / (te - ts));
-#if ALL_SAMPLES > 4
-        t_act_s.push_back(ts);
-        t_act_e.push_back(te);
-#endif
-
-#if IODATA_VERBOSE >= 1
-        printf("%s > rank %i %s> %s %s phase %li > #%lli > act over: %.3f KB handled in %f s -> T(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, te - ts, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_act.back() / 1000, BLACK);
-#endif
-#if IODATA_VERBOSE >= 2
-        printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), ts, te, BLACK);
-#endif
-    }
+    
 }
 
+/**
+ * @brief collects individual I/O operations
+ *
+ * @param b           [in] number of bytes transfered
+ * @param ts          [in] start time of I/O operation
+ * @param te          [in] end time of I/O operation
+ * @param path        [in] file this I/O operation belongs to
+ *
+ * @details Adds IO operation to tracked data
+ */
+void IOdata::Add_IO_Act(long long b, double ts, double te)
+{
+    bandwidth_act.push_back(b / (te - ts));
+#if ALL_SAMPLES > 4
+    t_act_s.push_back(ts);
+    t_act_e.push_back(te);
+#endif
 
-
+#if IODATA_VERBOSE >= 1
+    printf("%s > rank %i %s> %s %s phase %li > #%lli > act over: %.3f KB handled in %f s -> T(%li,%lli) = %.3f KB/s%s\n", caller, rank, CYAN, a_or_s, w_or_r, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), (double)b / 1000, te - ts, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), (double)bandwidth_act.back() / 1000, BLACK);
+#endif
+#if IODATA_VERBOSE >= 2
+    printf("%s > rank %i %s> %s %s phase %li > #%lli >> opertation from %f -> %f %s\n", caller, rank, YELLOW, a_or_s, w_or_r, phase_data.size(), bandwidth_act.size() - count_opertaions_agg(phase_data.size() - 1), ts, te, BLACK);
+#endif
+}
 
 /**
  *
@@ -123,8 +125,7 @@ void IOdata::Clear_IO(void)
     phases.clear();
     phase_data.clear();
 #if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-    path_to_io_req.clear();
-    path_to_io_act.clear();
+    path_to_io.clear();
 #endif
 }
 
@@ -185,7 +186,7 @@ void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
  * @details \e Phase_Start_Req sets the flag \e phase to active during the first call. During the first call to this function 
  * the flag becomes false and the required phase ends. 
  */
-void IOdata::Phase_End_Req(long long b, double ts, double te, std::filesystem::path path)
+void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
 {
     //TODO: add flag to control granualaierty of sampling. Individual I/O operation can be discarded if focus is on phase (remove vectors)
     if (phase){
@@ -205,7 +206,7 @@ void IOdata::Phase_End_Req(long long b, double ts, double te, std::filesystem::p
     }
 
     // add required values to tracked data
-    Add_Io(1, b, ts, te, path);
+    Add_IO_Req(b, ts, te, path);
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
@@ -234,7 +235,7 @@ void IOdata::Phase_End_Req(long long b, double ts, double te, std::filesystem::p
  * @param phase_condition condition indicating that the actual phase is over
  * @param path path of the file this I/O operation belongs to
  */
-void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_condition, std::filesystem::path path)
+void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_condition)
 {
 
     // [NOTE] Only true when all the Async I/O operations belong to this phase are over
@@ -259,7 +260,7 @@ void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_conditi
     
     //TODO: flag to contol granualrtiy of sampling
     //add actual values to tracked data
-    Add_Io(0, b, ts, te, path);
+    Add_IO_Act(b, ts, te);
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
@@ -341,17 +342,32 @@ T IOdata::Max(std::vector<T> a)
 }
 template long long IOdata::Max<long long>(std::vector<long long>);
 
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-double IOdata::Get_Prev_File_BW(std::filesystem::path path)
+#if defined (BW_LIMIT)
+#if BW_FILE_SPECIFIC == 1
+double IOdata::Get_Prev_File_BW(const std::filesystem::path& path)
 {
     double res = -1.0;
-    auto it = path_to_io_req.find(path);
-    if (it != path_to_io_req.end()) {
+    auto it = path_to_io.find(path);
+    if (it != path_to_io.end()) {
         size_t index = it->second.back();
         res = bandwidth_req[index];
     }
     return res;
 }
+#endif
+
+#if BW_FILE_SCALING == 1
+long long IOdata::Get_Prev_File_Size(const std::filesystem::path& path)
+{
+    long long res = 0;
+    auto it = path_to_io.find(path);
+    if (it != path_to_io.end()) {
+        size_t index = it->second.back();
+        res = bytes[index];
+    }
+    return res;
+}
+#endif
 #endif
 
 long long IOdata::count_opertaions(long long a)

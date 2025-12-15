@@ -49,10 +49,10 @@ public:
     std:: vector<double>    t_act_e;  // actaul end time
     std:: vector<double>    t_req_s;  // required start time (usually same as t_act_s)
     std:: vector<double>    t_req_e;  // required end time
+    std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
 #if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io_req;   // keeps file information for each required I/O operation
-    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io_act;   // keeps file information for each actual I/O operation
+    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io;   // I/O operations for each file
 #endif
     //*******************************
     //* Phase information 
@@ -68,12 +68,13 @@ public:
     void Phase_Start(bool, double,long long,long long );
     
     //? add I/O tracr or claer all I/O traces
-    void Add_Io(bool,long long,double,double,std::filesystem::path = std::filesystem::path{});
+    void Add_IO_Act(long long,double,double);
+    void Add_IO_Req(long long,double,double, const std::filesystem::path*);
     void Clear_IO(void);
     
     //? for Async tracing 
-    void Phase_End_Req(long long,double,double,std::filesystem::path = std::filesystem::path{});
-    void Phase_End_Act(long long,double,double,bool,std::filesystem::path = std::filesystem::path{});
+    void Phase_End_Act(long long,double,double,bool);
+    void Phase_End_Req(long long,double,double, const std::filesystem::path*);
     
     //? for Sync tracing 
     void Phase_End_Sync(double);
@@ -84,9 +85,13 @@ public:
     template <class T>
     T Max(std::vector<T>);
 
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
-    double Get_Prev_File_BW(std::filesystem::path);
-    double Get_Prev_File_Size(std::filesystem::path);
+#if defined (BW_LIMIT)
+#if BW_FILE_SPECIFIC == 1
+    double Get_Prev_File_BW(const std::filesystem::path&);
+#endif
+#if BW_FILE_SCALING == 1
+    long long Get_Prev_File_Size(const std::filesystem::path&);
+#endif
 #endif
     
     //? calucalte the Bandwidth after the application finishes
