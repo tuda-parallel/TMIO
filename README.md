@@ -246,6 +246,11 @@ some_array->request_arr[i] = req;
 MPI_File_iwrite_at(..., &req); // Different address from the one stored
 ```
 
+# List Of Contributors
+
+We sincerely thank the following contributors for their valuable contributions:
+- [Ahmad Tarraf](https://github.com/a-tarraf)
+- [Qi Chen](https://github.com/qbacpey): POSIX and IO_Uring tracing support
 
 
 [pipeline.badge]: https://git.rwth-aachen.de/parallel/tmio/badges/main/pipeline.svg
