@@ -15,12 +15,53 @@ private:
 	std::map<RequestIDType, std::filesystem::path> request_register;
 
 public:
-	void track_file_opened(const char*, const FDType);
-	void track_file_closed(const FDType);
-	std::filesystem::path* get_fd_path(const FDType);
-	void register_request(const RequestIDType, const FDType);
-	std::filesystem::path* get_request_path(const RequestIDType);
-	void unregister_request(const RequestIDType);
+	void track_file_opened(const char* path, const FDType fd)
+	{
+		// Get full unique path
+		auto full_path = std::filesystem::absolute(
+			std::filesystem::weakly_canonical(std::filesystem::path(path)));
+		file_register.insert(std::make_pair(fd, full_path));
+	};
+
+	void track_file_closed(const FDType fd) 
+	{
+		file_register.erase(fd);
+	};
+
+	std::filesystem::path* get_fd_path(const FDType fd) 
+	{
+		auto it = file_register.find(fd);
+		if (it != file_register.end()) {
+			return &it->second;
+		}
+		return nullptr;
+	};
+
+	void register_request(const RequestIDType request_id, const FDType fd) 
+	{
+		auto it = file_register.find(fd);
+		if (it != file_register.end()) {
+			auto path = it->second;
+			request_register.insert(std::make_pair(request_id, path));
+		}
+	};
+
+	std::filesystem::path* get_request_path(const RequestIDType request_id) 
+	{
+		auto it = request_register.find(request_id);
+		if(it != request_register.end()) {
+			return &it->second;
+		}
+		return nullptr;
+	};
+
+	void unregister_request(const RequestIDType request_id) 
+	{
+		auto it = request_register.find(request_id);
+		if(it != request_register.end()) {
+			request_register.erase(it);		
+		}
+	};
 };
 
 class Bw_limit
