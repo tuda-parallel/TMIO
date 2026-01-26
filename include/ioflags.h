@@ -239,6 +239,9 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 //colors output: 
 #define COLOR_OUTPUT 
 
+//Malleability support: 
+// #define MALLEABLE
+
 
 // * Batch IO Settings
 #ifndef BATCH_LIO

@@ -355,6 +355,9 @@ namespace ioprint
 	{
 		std::ofstream file;
 		static bool first_time = true;
+		#if defined MALLEABLE
+		first_time = false;
+		#endif 
 		std::string file_name = std::to_string(processes) + "_" + std::string(kLibName) + ".jsonl";
 		if (first_time)
 		{

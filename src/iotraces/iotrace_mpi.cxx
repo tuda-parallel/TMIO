@@ -13,7 +13,7 @@
  */
 void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
-    double start_time = MPI_Wtime() - t_0;
+    double start_time = Get_Time() - t_0;
     MPI_Type_size(datatype, &data_size_write);
     long long total_size = static_cast<long long>(count) * data_size_write;
 
@@ -66,7 +66,7 @@ void IOtraceMPI::Write_Async_Required(MPI_Request *request)
  */
 void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
-    double start_time = MPI_Wtime() - t_0;
+    double start_time = Get_Time() - t_0;
     MPI_Type_size(datatype, &data_size_read);
     long long total_size = static_cast<long long>(count) * data_size_read;
 
@@ -119,7 +119,7 @@ void IOtraceMPI::Read_Async_Required(MPI_Request *request)
 void IOtraceMPI::Write_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset offset)
 {
     // get write timestamp
-    double start_time = MPI_Wtime() - t_0;
+    double start_time = Get_Time() - t_0;
     t_sync_write_start = Overhead_Start(start_time);
 
     MPI_Type_size(datatype, &data_size_write);
@@ -151,7 +151,7 @@ void IOtraceMPI::Write_Sync_End(void)
 void IOtraceMPI::Read_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset offset)
 {
     // get read timestamp
-    double start_time = MPI_Wtime() - t_0;
+    double start_time = Get_Time() - t_0;
     t_sync_read_start = Overhead_Start(start_time);
     
     MPI_Type_size(datatype, &data_size_read);

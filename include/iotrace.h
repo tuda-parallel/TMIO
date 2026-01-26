@@ -86,6 +86,10 @@ protected:
 	long long size_async_read;	// size of async read operation in KB
 	long long size_sync_read;	// size of async read operation in KB
 
+
+#if defined MALLEABLE
+	inline static double t_start_accum = 0;			// accumulated time when IOtrace::Init is called (for each rank)
+#endif
 	double t_0;						// start time of app (for each rank)
 	double delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
 	double t_overhead = 0;			// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
@@ -160,6 +164,15 @@ protected:
 	//* Monitore ellapsed time
 	//*************************************
 	void Time_Info(std::string);
+
+	//*************************************
+	//* Malleability
+	//*************************************
+	double Get_Time();
+	#if defined MALLEABLE
+	void Load_IO_State(int, double &);
+	void Save_IO_State(int, double );
+	#endif
 
 	//*************************************
 	//* Debug

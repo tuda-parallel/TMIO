@@ -42,12 +42,15 @@ IOtraceBase<Tag>::IOtraceBase(void) : p_aw(&aw), p_ar(&ar), p_sw(&sw), p_sr(&sr)
 template <typename Tag>
 void IOtraceBase<Tag>::Init(void)
 {
-
-    t_0 = MPI_Wtime();
+	
+	t_0 = MPI_Wtime();
     t_summary = t_0;
-    //? create copy of communicator
+	//? create copy of communicator
     MPI_Comm_dup(MPI_COMM_WORLD, &IO_WORLD);
     MPI_Comm_set_errhandler(IO_WORLD, MPI_ERRORS_RETURN);
+	#if defined MALLEABLE
+	Load_IO_State(rank, t_start_accum);
+	#endif
     // int r,s;
     // MPI_Comm_rank(IO_WORLD, &r);
     // MPI_Comm_size(IO_WORLD, &s);
@@ -97,12 +100,12 @@ template <typename Tag>
 void IOtraceBase<Tag>::Summary(void)
 {
     // iohf::Function_Debug(__PRETTY_FUNCTION__);
-    delta_t_app = delta_t_app + (MPI_Wtime() - t_summary);
+    delta_t_app = delta_t_app + (Get_Time() - t_summary);
     // printf("%s > rank %i > generating I/O summary start %f \n", caller, rank,delta_t_app);
     Time_Info(std::string(this->kLibName) + " > Summary > started at");
 #if IOTRACE_VERBOSE >= 1
     // if (rank == 0)
-    // printf("%s > rank %i %s> Elapsed time: %e s %s\n", caller, rank, GREEN, MPI_Wtime() - t_0, BLACK);
+    // printf("%s > rank %i %s> Elapsed time: %e s %s\n", caller, rank, GREEN, Get_Time() - t_0, BLACK);
     printf("%s > rank %i > generating I/O summary \n", caller, rank);
 #endif
 
@@ -206,7 +209,7 @@ void IOtraceBase<Tag>::Summary(void)
     }
     Time_Info("Statistics compute done >");
 
-    // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,MPI_Wtime() - t_0);
+    // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,Get_Time() - t_0);
 
     //? Overhead calculation
     //?-------------------------
@@ -224,7 +227,7 @@ void IOtraceBase<Tag>::Summary(void)
         printf("%s > rank %i > generating I/O summary %s> printing file %s\n", caller, rank, BLUE, BLACK);
 #endif
 
-        double time_rank0[3] = {delta_t_app, delta_t_io_overhead, (MPI_Wtime() - t_summary) - delta_t_app};
+        double time_rank0[3] = {delta_t_app, delta_t_io_overhead, (Get_Time() - t_summary) - delta_t_app};
 
         iotime io_time(time, time_rank0, s_sr, s_ar, s_sw, s_aw);
         if (finalize)
@@ -266,7 +269,7 @@ void IOtraceBase<Tag>::Summary(void)
     }
     if (!finalize)
     {
-        t_summary = MPI_Wtime() - t_0;
+        t_summary = Get_Time() - t_0;
         delta_t_app = 0;
         delta_t_io_overhead = 0;
 
@@ -279,7 +282,12 @@ void IOtraceBase<Tag>::Summary(void)
         bw_limit.Reset();
 #endif
     }
-    // printf("%s > rank %i > generating I/O summary end 2 %f \n", caller, rank,MPI_Wtime() - t_0);
+	else{
+#if defined MALLEABLE
+	t_start_accum += MPI_Wtime() - t_0;
+	Save_IO_State(rank, t_start_accum);
+#endif
+	}
 }
 
 //! ------------------------------ Async write tracing -------------------------------
@@ -321,7 +329,7 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
 template <typename Tag>
 void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_status)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
+    Overhead_Start(Get_Time() - t_0);
 
     // actual write ended signilized by flag of MPI_Test or at the end of MPI_Wait. This flag will always be true if the I/O operation ended
     if (write_status == 1)
@@ -331,8 +339,8 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         {
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
-            // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_requests.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
-            p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0, Act_Done(0));
+            // p_aw->Phase_End_Act(size_async_write, t_async_write_start, Get_Time() - t_0,(async_write_requests.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
+            p_aw->Phase_End_Act(size_async_write, t_async_write_start, Get_Time() - t_0, Act_Done(0));
 
 #if IOTRACE_VERBOSE >= 2
             static long int counter = 1;
@@ -361,11 +369,11 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
 {
     IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>> Wait reached (Req waiting) async write @ %.8f s, (Request: %ld)\n", caller, rank,
-        GREEN, MPI_Wtime() - t_0, request);
-    Overhead_Start(MPI_Wtime() - t_0);
+        GREEN, Get_Time() - t_0, request);
+    Overhead_Start(Get_Time() - t_0);
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
-        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0);
+        p_aw->Phase_End_Req(size_async_write, t_async_write_start, Get_Time() - t_0);
 
 #if IOTRACE_VERBOSE >= 2
 	static long int counter = 1;
@@ -416,8 +424,8 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
     // Print the request being waited on
     IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>> Wait reached (Act waiting) async read @ %.8f s, (Request: %ld)\n", caller, rank,
-        GREEN, MPI_Wtime() - t_0, request);
-    Overhead_Start(MPI_Wtime() - t_0);
+        GREEN, Get_Time() - t_0, request);
+    Overhead_Start(Get_Time() - t_0);
 
     // actual read ended signilized by flag of MPI_Test or at the end of MPI_Wait. This flag will always be true if the I/O operation ended
     if (read_status == 1)
@@ -426,10 +434,10 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
         if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 2))
         {
             // add values to traced data and add phase values if condition is true
-            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, (async_read_requests.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
+            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, Get_Time() - t_0, (async_read_requests.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
-            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0,(async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
-            p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, Act_Done(1));
+            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, Get_Time() - t_0,(async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
+            p_ar->Phase_End_Act(size_async_read, t_async_read_start, Get_Time() - t_0, Act_Done(1));
             // std::cout << "Act_Done return" << Act_Done(1) << std::endl;
 
 #if IOTRACE_VERBOSE >= 2
@@ -457,12 +465,12 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     // Print the request being waited on
     IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i %s>> Wait reached (Req waiting) async read @ %.8f s, (Request: %ld)\n", caller, rank,
-        GREEN, MPI_Wtime() - t_0, request);
-    Overhead_Start(MPI_Wtime() - t_0);
+        GREEN, Get_Time() - t_0, request);
+    Overhead_Start(Get_Time() - t_0);
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {   
         // Print an error message if start time is larger than end time
-        double req_end_time = MPI_Wtime() - t_0;
+        double req_end_time = Get_Time() - t_0;
         if (req_end_time < t_async_read_start) {
             IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
                 "%s > rank %i %s>>>> Warning: Async read required end time %.8f s is smaller than start time %.8f s %s\n", caller, rank, RED, req_end_time, t_async_read_start, BLACK);
@@ -512,7 +520,7 @@ void IOtraceBase<Tag>::Write_Sync_Start_Impl(long long size, long long offset, d
 template <typename Tag>
 void IOtraceBase<Tag>::Write_Sync_End_Impl(void)
 {
-    t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
+    t_sync_write_end = Overhead_Start(Get_Time() - t_0);
 
     p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
 
@@ -562,7 +570,7 @@ void IOtraceBase<Tag>::Read_Sync_Start_Impl(long long size, long long offset, do
 template <typename Tag>
 void IOtraceBase<Tag>::Read_Sync_End_Impl(void)
 {
-    t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
+    t_sync_read_end = Overhead_Start(Get_Time() - t_0);
 
     p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
 
@@ -814,7 +822,7 @@ void IOtraceBase<Tag>::Overhead_End(void)
 {
 
 #if OVERHEAD == 1
-    delta_t_io_overhead += MPI_Wtime() - t_0 - t_overhead;
+    delta_t_io_overhead += Get_Time() - t_0 - t_overhead;
 #endif
 };
 
@@ -849,8 +857,8 @@ double *IOtraceBase<Tag>::Overhead_Calculation(void)
     tmp_time[2] = delta_t_io_overhead; // in-period overhead during applicaiton runtime
 #endif
 
-    // tmp_time[1] = (MPI_Wtime() - t_0) - delta_t_app; // overhead after application finishes
-    tmp_time[1] = (MPI_Wtime() - t_summary) - delta_t_app; // summary overhead after application finishes
+    // tmp_time[1] = (Get_Time() - t_0) - delta_t_app; // overhead after application finishes
+    tmp_time[1] = (Get_Time() - t_summary) - delta_t_app; // summary overhead after application finishes
 
     if (rank == 0)
         time_array = (double *)malloc(sizeof(double) * n_time);
@@ -878,14 +886,108 @@ void IOtraceBase<Tag>::Time_Info(std::string s)
 #ifdef TIME_VERBOSE
     if (rank == 0)
     {
-        // static double t_passed = MPI_Wtime() - t_0;
-        static double t_passed = MPI_Wtime() - t_summary;
-        printf("%s > rank %i %s> IOtrace > %s time: %.4e s --> passed time %.4f s %s\n", caller, rank, YELLOW, s.c_str(), MPI_Wtime() - t_0, (MPI_Wtime() - t_0) - t_passed, BLACK);
-        // t_passed = MPI_Wtime() - t_0;
-        t_passed = MPI_Wtime() - t_summary;
+        // static double t_passed = Get_Time() - t_0;
+        static double t_passed = Get_Time() - t_summary;
+        printf("%s > rank %i %s> IOtrace > %s time: %.4e s --> passed time %.4f s %s\n", caller, rank, YELLOW, s.c_str(), Get_Time() - t_0, (Get_Time() - t_0) - t_passed, BLACK);
+        // t_passed = Get_Time() - t_0;
+        t_passed = Get_Time() - t_summary;
     }
 #endif
 }
+
+//! ---------------------- Bw limit with Custom MPI implementaiton -------------------
+//************************************************************************************
+//*                               Malleable
+//************************************************************************************
+
+/**
+ * @brief Returns the current logical time for I/O tracing.
+ *        Uses get_time() normally. If MALLEABLE, applies offset so
+ *        time continues smoothly across reconfigurations.
+ */
+template <typename Tag>
+double IOtraceBase<Tag>::Get_Time(void)
+{
+#if defined MALLEABLE
+	if (rank == 0)
+		printf("%s > rank %i > Get_Time called, t_start_accum = %f \n", caller, rank, t_start_accum);
+    return MPI_Wtime() + t_start_accum;
+#else
+    return MPI_Wtime();
+#endif
+}
+
+#if defined MALLEABLE
+template <typename Tag>
+void IOtraceBase<Tag>::Save_IO_State(int rank, double t_start_accum)
+{
+	#define IOTRACE_VERBOSE 1
+    // Compute the maximum t_start_accum across all ranks
+    double t_max = 0.0;
+    MPI_Reduce(&t_start_accum, &t_max, 1, MPI_DOUBLE, MPI_MAX, 0, IO_WORLD);
+
+    // Only rank 0 writes the checkpoint
+    if (rank == 0)
+    {
+        char filename[256];
+        snprintf(filename, sizeof(filename),
+                 "IOtraceState_%s.bin",
+                 IOtraceTraits<Tag>::Name);
+        FILE *f = fopen(filename, "wb");
+        if (f)
+        {
+            fwrite(&t_max, sizeof(double), 1, f);
+            fclose(f);
+#if IOTRACE_VERBOSE >= 1
+            printf("%s > rank %i > checkpoint saved to %s, t_start_accum = %f\n", caller, rank, filename, t_max);
+#endif
+        }
+        else
+        {
+            printf("%s > rank %i > ERROR: unable to save checkpoint to %s\n", caller, rank, filename);
+        }
+    }
+}
+
+template <typename Tag>
+void IOtraceBase<Tag>::Load_IO_State(int rank, double &t_start_accum)
+{	
+	#define IOTRACE_VERBOSE 1
+    double t_value = 0.0;
+
+    if (rank == 0)
+    {
+         char filename[256];
+        snprintf(filename, sizeof(filename),
+                 "IOtraceState_%s.bin",
+                 IOtraceTraits<Tag>::Name);
+        FILE *f = fopen(filename, "rb");
+        if (f)
+        {
+            fread(&t_value, sizeof(double), 1, f);
+            fclose(f);
+            std::remove(filename); // delete checkpoint after reading
+#if IOTRACE_VERBOSE >= 1
+            printf("%s > rank %i > checkpoint loaded from %s, t_start_accum = %f (file deleted)\n", caller, rank, filename, t_value);
+#endif
+        }
+        else
+        {
+            t_value = 0.0;
+#if IOTRACE_VERBOSE >= 1
+            printf("%s > rank %i > checkpoint file %s not found. t_start_accum reset to 0\n", caller, rank, filename);
+#endif
+        }
+    }
+
+    // Broadcast the loaded value to all ranks
+    MPI_Bcast(&t_value, 1, MPI_DOUBLE, 0, IO_WORLD);
+
+    // Update local t_start_accum
+    t_start_accum = t_value;
+}
+#endif
+
 
 //! ------------------------------ Set flags -------------------------------
 //************************************************************************************
@@ -916,7 +1018,7 @@ void IOtraceBase<Tag>::Set(std::string flag, bool value)
 template <typename Tag>
 void IOtraceBase<Tag>::Apply_Limit(void)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
+    Overhead_Start(Get_Time() - t_0);
     bw_limit.Limit_Async();
     Overhead_End();
 }
@@ -930,7 +1032,7 @@ void IOtraceBase<Tag>::Apply_Limit(void)
 template <typename Tag>
 void IOtraceBase<Tag>::Replace_Test(void)
 {
-    Overhead_Start(MPI_Wtime() - t_0);
+    Overhead_Start(Get_Time() - t_0);
     bw_limit.Set_Throughput();
     Overhead_End();
 }
