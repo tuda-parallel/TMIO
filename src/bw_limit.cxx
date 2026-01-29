@@ -169,6 +169,10 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 	EMPI_DATA_IREAD = 0;
 #endif 
 
+#if BW_LIMIT_FTIO == 1
+	ftio_freq_pred = -1.0;
+#endif
+
 #ifdef BW_LIMIT
 	EMPI_IOBLOCK = 200000;
 
@@ -214,7 +218,7 @@ void Bw_limit::Limit_Async(bool write, [[maybe_unused]] const std::filesystem::p
 	{
 		const double T = (static_cast<double>(EMPI_DATA_IWRITE)) / (static_cast<double>(EMPI_UTIME_IWRITE) / 1'000'000);
 
-		double measured_bw; 
+		double measured_bw = 0.0; 
 
 		if constexpr (BW_FILE_SPECIFIC == 1) {
 			if(path)
@@ -261,7 +265,7 @@ void Bw_limit::Limit_Async(bool write, [[maybe_unused]] const std::filesystem::p
 	{
 		const double T = (static_cast<double>(EMPI_DATA_IREAD)) / (static_cast<double>(EMPI_UTIME_IREAD) / 1'000'000);
 
-		double measured_bw;
+		double measured_bw = 0.0;
 
 		if constexpr (BW_FILE_SPECIFIC == 1) {
 			if(path)
@@ -367,5 +371,41 @@ void Bw_limit::Set_Throughput(void)
 		EMPI_UTIME_IREAD = 0;
 		EMPI_DATA_IREAD = 0;
 	}
+}
+#endif
+
+#if BW_LIMIT_FTIO == 1
+//************************************************************************************
+//*                               1. Receive_Dominant_Frequency
+//************************************************************************************
+/**
+ * @brief Receive dominant frequency from FTIO via ZMQ
+ *
+ */
+void Bw_limit::Receive_Dominant_Frequency(int rank, MPI_Comm IO_WORLD) {
+
+	double value = -1.0;
+
+	if (rank == 0) {
+		zmq::context_t context(1);
+		zmq::socket_t receiver(context, ZMQ_PULL);
+		receiver.connect("tcp://127.0.0.1:5556");
+		
+		zmq::message_t msg;
+		receiver.recv(&msg, ZMQ_DONTWAIT);
+
+		if (!msg.empty()) {
+			std::memcpy(&value, msg.data(), sizeof(double));
+		}
+	}
+
+	int root = 0;
+
+	MPI_Bcast(&value, 1, MPI_DOUBLE, 0, IO_WORLD);
+
+	if (value >= 0.0) {
+		ftio_freq_pred = value;
+	}
+
 }
 #endif

@@ -187,7 +187,15 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 // if set to above 0, the confidence check is executed
 #endif
 
-
+//* Output File     
+//*******************************
+#ifndef FILE_FORMAT
+#define FILE_FORMAT 3
+// 0 FILE_FORMAT "jsonl"
+// 1 FILE_FORMAT "binary" 
+// 2 FILE_FORMAT "msgpack" 
+// 3 FILE_FORMAT "zmq" 
+#endif
 
 //* Bandwidth Limit  
 //*******************************
@@ -219,24 +227,15 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #ifndef BW_FILE_SPECIFIC
 #define BW_FILE_SPECIFIC 1
 #endif
-// Limit baandwidth based on file size difference
+// Limit bandwidth based on file size difference
 #ifndef BW_FILE_SCALING
 #define BW_FILE_SCALING 1
 #endif
+// Use FTIO for phase length calculation
+#if FILE_FORMAT == 3 // ZMQ
+#define BW_LIMIT_FTIO 1
 #endif
-
-
-
-//* Output File     
-//*******************************
-#ifndef FILE_FORMAT
-#define FILE_FORMAT 0
-// 0 FILE_FORMAT "jsonl"
-// 1 FILE_FORMAT "binary" 
-// 2 FILE_FORMAT "msgpack" 
-// 3 FILE_FORMAT "zmq" 
 #endif
-
 
 
 

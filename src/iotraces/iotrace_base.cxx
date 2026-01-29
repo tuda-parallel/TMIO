@@ -211,6 +211,8 @@ void IOtraceBase<Tag>::Summary(void)
     //?-------------------------
     double *time = Overhead_Calculation();
 
+    bw_limit.
+
     //? Print
     //?-------------------------
     if (rank == 0)
@@ -358,7 +360,7 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
         std::filesystem::path* path = nullptr;
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
         path = file_tracker.get_request_path(request);
 #endif
         p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, path);
@@ -448,7 +450,7 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
         std::filesystem::path* path = nullptr;
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
         path = file_tracker.get_request_path(request);
 #endif
         p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, path);
@@ -564,7 +566,7 @@ void IOtraceBase<Tag>::Open(const char *path, const FDType fd)
 {
     open = 1;
 
-#if defined(BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
     Overhead_Start(MPI_Wtime() - t_0);
     file_tracker.track_file_opened(path, fd);
     Overhead_End();
@@ -591,7 +593,7 @@ void IOtraceBase<Tag>::Close(const FDType fd)
     {
         open = 0;
 
-#if defined(BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
         Overhead_Start(MPI_Wtime() - t_0);
         file_tracker.track_file_closed(fd);
         Overhead_End();

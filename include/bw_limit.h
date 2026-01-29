@@ -82,6 +82,10 @@ private:
 	IOdata *p_sw;
 	IOdata *p_sr;
 
+#if BW_LIMIT_FTIO == 1
+	double ftio_freq_pred;
+#endif
+
 #if defined BW_LIMIT
 	double scale_bw_write;	// scales the bandwidth limit of sync write operations
 	double scale_bw_read;	// scales the bandwidth limit of sync read operations
@@ -94,7 +98,7 @@ private:
 	double Br;
 
 	double Get_BW_Limit(const double, const double) const;
-
+	
 #endif // BW_LIMIT
 
 	double Get(Transaction_Type, std::string info) const;
@@ -125,6 +129,8 @@ public:
 #if defined CUSTOM_MPI || BW_LIMIT
 	void Set_Throughput(void);
 #endif
-
+#if BW_LIMIT_FTIO == 1
+	void Receive_Dominant_Frequency();
+#endif
 };
 #endif // BW_LIMIT_H

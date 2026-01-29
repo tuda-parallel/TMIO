@@ -45,7 +45,7 @@ void IOdata::Mode(int r, bool a, bool b)
 void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
 {
 
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
     if (path) {
         path_to_io.try_emplace(*path).first->second.push_back(bandwidth_req.size());
     }
@@ -124,7 +124,7 @@ void IOdata::Clear_IO(void)
     t_req_e.clear();
     phases.clear();
     phase_data.clear();
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_FILE_SPECIFIC == 1
     path_to_io.clear();
 #endif
 }
