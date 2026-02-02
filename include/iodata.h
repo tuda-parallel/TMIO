@@ -51,7 +51,7 @@ public:
     std:: vector<double>    t_req_e;  // required end time
     std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-#if defined (BW_LIMIT) && BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
     std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io;   // I/O operations for each file
 #endif
     //*******************************
@@ -85,13 +85,11 @@ public:
     template <class T>
     T Max(std::vector<T>);
 
-#if defined (BW_LIMIT)
-#if BW_FILE_SPECIFIC == 1
-    double Get_Prev_File_BW(const std::filesystem::path&);
+#if BW_LIMIT_GRANULARITY > 1
+    double get_prev_file_bw(const std::filesystem::path&);
 #endif
-#if BW_FILE_SCALING == 1
-    long long Get_Prev_File_Size(const std::filesystem::path&);
-#endif
+#if BW_LIMIT_GRANULARITY == 3
+    long long get_prev_file_size(const std::filesystem::path&);
 #endif
     
     //? calucalte the Bandwidth after the application finishes

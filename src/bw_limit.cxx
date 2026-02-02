@@ -83,7 +83,7 @@ void Bw_limit::Reset(void)
 }
 
 //************************************************************************************
-//*                               1. Get
+//*                               1. get_phase_info
 //************************************************************************************
 /**
  * @brief returns the I/O traces to extern libaries.
@@ -92,7 +92,7 @@ void Bw_limit::Reset(void)
  * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
  * @return double
  */
-double Bw_limit::Get(Transaction_Type mode, std::string info) const
+double Bw_limit::get_phase_info(Transaction_Type mode, std::string info) const
 {
 	double res;
 	switch (mode)
@@ -114,7 +114,7 @@ double Bw_limit::Get(Transaction_Type mode, std::string info) const
 }
 
 //************************************************************************************
-//*                               2. Set
+//*                               2. set_phase_info
 //************************************************************************************
 /**
  * @brief assigns the I/O traces by extern libaries.
@@ -123,7 +123,7 @@ double Bw_limit::Get(Transaction_Type mode, std::string info) const
  * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
  * @param value value assigned to the variable
  */
-void Bw_limit::Set(Transaction_Type mode, std::string info, double value)
+void Bw_limit::set_phase_info(Transaction_Type mode, std::string info, double value)
 {
 	switch (mode)
 	{
@@ -170,7 +170,7 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 #endif 
 
 #if BW_LIMIT_FTIO == 1
-	ftio_freq_pred = -1.0;
+	ftio_phase_pred = -1.0;
 #endif
 
 #ifdef BW_LIMIT
@@ -200,121 +200,143 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 #endif
 }
 
-#ifdef BW_LIMIT
+#if BW_LIMIT_GRANULARITY > 1
 
-//! --------------------------- For BW Limiting only -----------------------------------
-//************************************************************************************
-//*                               1. Limit_Async
-//************************************************************************************
-/**
- * @brief Limits I/O through extern MPI.
- * @param path path to the accessed file
- * @param write true = write, false = read
- */
-void Bw_limit::Limit_Async(bool write, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size)
+void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size)
 {
-	// Async write
-	if (write)
-	{
-		const double T = (static_cast<double>(EMPI_DATA_IWRITE)) / (static_cast<double>(EMPI_UTIME_IWRITE) / 1'000'000);
-
-		double measured_bw = 0.0; 
-
-		if constexpr (BW_FILE_SPECIFIC == 1) {
-			if(path)
-				measured_bw = p_aw->Get_Prev_File_BW(*path);
-		} else {
-			measured_bw = Bw_limit::Get(Transaction_Type::Async_Write, "B_sum");
-		}
-
-		if (measured_bw <= 0.0) {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth");
-			return;
-		}
-		
-		const double bw = Get_BW_Limit(measured_bw, bw_limit_iwrite);
-
-		if (bw != bw_limit_iwrite) {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync write %s> BW old goal: %.2f Mb/s   BW: %.2f (%.2f) Mb/s   BW new goal: %.2f Mb/s%s\n", caller, rank, processes - 1, GREEN, BLUE, bw_limit_iwrite / 1'000'000, T / 1'000'000, T / 1'000'000, bw / 1'000'000, BLACK);
-			bw_limit_iwrite = bw;
-		}
-		else {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync write %s> BW old goal: %.2f Mb/s   BW: %.2f (%.2f) Mb/s %s\n", caller, rank, processes - 1, GREEN, BLUE, bw_limit_iwrite / 1'000'000, T / 1'000'000, T / 1'000'000, BLACK);
-		}
-
-		EMPI_DESIRED_BW_IWRITE = bw_limit_iwrite;
-
-		EMPI_DATA_IWRITE = 0;
-		EMPI_UTIME_IWRITE = 0;
-		
-		double scale_factor = 1.0;
-		if constexpr (BW_FILE_SCALING == 1) {
-			if (path) {
-				long long prev_transaction_size = p_aw->Get_Prev_File_Size(*path);
-				scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
-
-				double scaled_limit = scale_factor * bw;
-
-				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync write %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
-			}
-		}
-
-		EMPI_SCALE_BW_IWRITE = scale_factor;
+	if (p_aw->phase_data.size() > counter_iwrite) {
+		set_throughput_impl(Transaction_Type::Async_Write);
+		bw_limit_iwrite = 0.0;
+		counter_iwrite = p_aw->phase_data.size();
 	} 
-	else // Async read
-	{
-		const double T = (static_cast<double>(EMPI_DATA_IREAD)) / (static_cast<double>(EMPI_UTIME_IREAD) / 1'000'000);
+	
+	if (p_ar->phase_data.size() > counter_iread) {
+		set_throughput_impl(Transaction_Type::Async_Read);
+		bw_limit_iwrite = 0.0;
+		counter_iread = p_ar->phase_data.size();
+	}
 
-		double measured_bw = 0.0;
+	double file_measured_bw = 0.0;
 
-		if constexpr (BW_FILE_SPECIFIC == 1) {
-			if(path)
-				measured_bw = p_ar->Get_Prev_File_BW(*path);
-		} else {
-			measured_bw = Bw_limit::Get(Transaction_Type::Async_Read, "B_sum");
-		}
+	Transaction_Type transaction = write? Transaction_Type::Async_Write : Transaction_Type::Async_Read;
+	IOdata* p_data = write? p_aw : p_ar;
 
-		if (measured_bw <= 0.0) {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth");
-			return;
-		}
+	
+	if(path)
+		file_measured_bw = p_data->get_prev_file_bw(*path);
 
-		auto bw = Get_BW_Limit(measured_bw, bw_limit_iread);
-				
-		if (bw != bw_limit_iread) {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> BW old goal: %.2f Mb/s   BW: %.2f (%.2f) Mb/s   BW new goal: %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, bw_limit_iread / 1'000'000, T / 1'000'000, T / 1'000'000, bw / 1'000'000, BLACK);
-			bw_limit_iread = bw;
-		} else {
-			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> BW old goal: %.2f Mb/s   BW: %.2f (%.2f) Mb/s %s\n", caller, rank, processes - 1, YELLOW, BLUE, bw_limit_iread / 1'000'000, T / 1'000'000, T / 1'000'000, BLACK);
-		}
-		
-		EMPI_DESIRED_BW_IREAD = bw_limit_iread;
+	if (file_measured_bw <= 0.0) {
+		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth, falling back to phase BW");
+		double phase_duration = Bw_limit::get_phase_info(transaction, "t_start") - Bw_limit::get_phase_info(transaction, "t_end_req");
+		file_measured_bw = transaction_size / phase_duration;
+	}
+	
+	double file_bw_limit = file_measured_bw * TOL;
 
-		EMPI_UTIME_IREAD = 0;
-		EMPI_DATA_IREAD = 0;
-
+	if constexpr (BW_LIMIT_GRANULARITY == 3) {
 		double scale_factor = 1.0;
-		if constexpr (BW_FILE_SCALING == 1) {
-			if (path) {
-				long long prev_transaction_size = p_ar->Get_Prev_File_Size(*path);
+
+		if (path) {
+			long long prev_transaction_size = p_data->get_prev_file_size(*path);
+
+			if(prev_transaction_size > 0) {
 				scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
 
-				double scaled_limit = scale_factor * bw;
+				double scaled_limit = scale_factor * file_bw_limit;
 
-				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n", caller, rank, processes - 1, YELLOW, BLUE, scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
+				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n",
+					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE,
+					scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
+
+				file_bw_limit = scaled_limit
+			} else {
+				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous transaction, no scaling applied");
 			}
-		} 
+		}
+	}
 
-		EMPI_SCALE_BW_IREAD = scale_factor;
+	if(transaction == Transaction_Type::Async_Write) {
+		bw_limit_iwrite += file_bw_limit;
+		EMPI_DESIRED_BW_IWRITE = desired_bw;
+	} else {
+		bw_limit_iread += file_bw_limit;
+		EMPI_DESIRED_BW_IREAD = desired_bw;
 	}
 }
 
+#endif
+
+#if BW_LIMIT_GRANULARITY == 1
+
+//! --------------------------- For BW Limiting only -----------------------------------
+//************************************************************************************
+//*                               1. limit_async
+//************************************************************************************
+/**
+ * @brief Limits I/O through extern MPI.
+ */
+void Bw_limit::limit_async() {
+	Transaction_Type transaction;
+	
+	if (p_aw->phase_data.size() > counter_iwrite) {
+		
+		limit_async_impl(Transaction_Type::Async_Write);
+		counter_iwrite = p_aw->phase_data.size();
+	} else if (p_ar->phase_data.size() > counter_iread) {
+
+		limit_async_impl(Transaction_Type::Async_Read);
+		counter_iread = p_ar->phase_data.size();
+	}
+}
+
+void Bw_limit::limit_async_impl(Transaction_Type transaction) {
+	double phase_throughput = set_throughput_impl(transaction);
+
+	double measured_bw = 0.0;
+
+	if constexpr (BW_LIMIT_FTIO == 1) {
+		if(ftio_phase_pred < 0.0) {
+			measured_bw = Bw_limit::get_phase_info(transaction, "B_sum");
+		} else {
+			measured_bw = Bw_limit::get_phase_info(transaction, "data") / ftio_phase_pred;
+		}
+	} else {
+		measured_bw = Bw_limit::get_phase_info(transaction, "B_sum");
+	}
+
+	double& prev_bw_limit = (transaction == Transaction_Type::Async_Write)? bw_limit_iwrite : bw_limit_iread;
+
+	const double desired_bw = calculate_bw_limit(measured_bw, prev_bw_limit);
+
+	if (desired_bw != prev_bw_limit) {
+		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW old goal: %.2f Mb/s   BW: %.2f Mb/s   BW new goal: %.2f Mb/s%s\n",
+			caller, rank, processes - 1, GREEN, (transaction == Transaction_Type::Async_Write)? "async_write" : "async_read", BLUE,
+			prev_bw_limit / 1'000'000, phase_throughput / 1'000'000, desired_bw / 1'000'000, BLACK);
+
+		prev_bw_limit = desired_bw;
+	}
+	else {
+		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW old goal: %.2f Mb/s   BW: %.2f Mb/s %s\n",
+			caller, rank, processes - 1, GREEN, (transaction == Transaction_Type::Async_Write)? "async_write" : "async_read", BLUE,
+			desired_bw / 1'000'000, phase_throughput / 1'000'000, BLACK);
+	}
+
+	if(transaction == Transaction_Type::Async_Write) {
+		EMPI_DESIRED_BW_IWRITE = desired_bw;
+	} else {
+		EMPI_DESIRED_BW_IREAD = desired_bw;
+	}
+}
+
+#endif
+
+#ifdef BW_LIMIT
 /**
  * @brief Calculates new bandwidth limit based on current strategy
  * @param measured_bw last bw measured for this transaction
  * @param prev_bw_limit last limit applied to this transaction
  */
-double Bw_limit::Get_BW_Limit(const double measured_bw, const double prev_bw_limit) const
+double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_bw_limit) const
 {
 	double pot_limit = TOL * measured_bw;
 
@@ -335,56 +357,72 @@ double Bw_limit::Get_BW_Limit(const double measured_bw, const double prev_bw_lim
 #endif
 
 //!------------------- modify T and duration in case custom MPI version or BW Limit---------------
-#if defined CUSTOM_MPI || defined BW_LIMIT
+#ifdef CUSTOM_MPI
 //************************************************************************************
-//*                               1. Set_Throughput
+//*                               1. set_throughput
 //************************************************************************************
 /**
- * @brief assigns Throughput through custom MPI version
+ * @brief assigns throughput through custom MPI version
  *
  */
-void Bw_limit::Set_Throughput(void)
+void Bw_limit::set_throughput(void)
 {
-	//?Async write
-	if (p_aw->phase_data.size() > counter_iwrite)
-	{
-		double T = (static_cast<double>(EMPI_DATA_IWRITE)) / (static_cast<double>(EMPI_UTIME_IWRITE) / 1'000'000);
-		Bw_limit::Set(Transaction_Type::Async_Write, "T_avr", T);
-		Bw_limit::Set(Transaction_Type::Async_Write, "t_end_act", Bw_limit::Get(Transaction_Type::Async_Write, "t_start") + static_cast<double>(EMPI_UTIME_IWRITE) / 1'000'000);
-
-		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync write %s> T set to(%.2f) Mb/s %s\n", caller, rank, processes - 1, YELLOW, BLUE, T / 1'000'000, BLACK);
-
+	if (p_aw->phase_data.size() > counter_iwrite) {
+		set_throughput_impl(Transaction_Type::Async_Write);
 		counter_iwrite = p_aw->phase_data.size();
-		EMPI_UTIME_IWRITE = 0;
-		EMPI_DATA_IWRITE = 0;
-	}
-
-	if (p_ar->phase_data.size() > counter_iread)
-	{
-		double T = (static_cast<double>(EMPI_DATA_IREAD)) / (static_cast<double>(EMPI_UTIME_IREAD) / 1'000'000);
-		Bw_limit::Set(Transaction_Type::Async_Read, "T_avr", T);
-		Bw_limit::Set(Transaction_Type::Async_Read, "t_end_act", Bw_limit::Get(Transaction_Type::Async_Read, "t_start") + static_cast<double>(EMPI_UTIME_IREAD) / 1'000'000);
-
-		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %sasync read %s> T set to(%.2f) Mb/s %s\n", caller, rank, processes - 1, YELLOW, BLUE, T / 1'000'000, BLACK);
-
+	} 
+	
+	if (p_ar->phase_data.size() > counter_iread) {
+		set_throughput_impl(Transaction_Type::Async_Read);
 		counter_iread = p_ar->phase_data.size();
-		EMPI_UTIME_IREAD = 0;
-		EMPI_DATA_IREAD = 0;
 	}
 }
 #endif
 
+#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
+//************************************************************************************
+//*                               1. set_throughput
+//************************************************************************************
+/**
+ * @brief assigns throughput through custom MPI version for one transaction type
+ * @param tt type of transaction to asign throughput to
+ */
+double Bw_limit::set_throughput_impl(Transaction_Type tt)
+{
+	const long& empi_data = (tt == Transaction_Type::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
+	const long& empi_utime = (tt == Transaction_Type::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
+
+	double phase_throughput = (static_cast<double>(empi_data)) / (static_cast<double>(empi_utime) / 1'000'000);
+
+	//?Async write
+	Bw_limit::set_phase_info(tt, "T_avr", phase_throughput);
+	Bw_limit::set_phase_info(
+		tt, "t_end_act",
+		Bw_limit::get_phase_info(tt, "t_start") + static_cast<double>(empi_utime) / 1'000'000);
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> T set to(%.2f) Mb/s %s\n",
+			caller, rank, processes - 1, YELLOW, (tt == Transaction_Type::Async_Write)? "async_write" : "async_read",
+			BLUE, phase_throughput / 1'000'000, BLACK);
+
+	empi_data = 0;
+	empi_utime = 0;
+
+	return phase_throughput;
+}
+#endif
+
+
 #if BW_LIMIT_FTIO == 1
 //************************************************************************************
-//*                               1. Receive_Dominant_Frequency
+//*                               1. receive_dominant_frequency
 //************************************************************************************
 /**
  * @brief Receive dominant frequency from FTIO via ZMQ
  *
  */
-void Bw_limit::Receive_Dominant_Frequency(int rank, MPI_Comm IO_WORLD) {
+void Bw_limit::receive_dominant_frequency(int rank, MPI_Comm IO_WORLD) {
 
-	double value = -1.0;
+	double dominant_frequency = -1.0;
 
 	if (rank == 0) {
 		zmq::context_t context(1);
@@ -395,17 +433,16 @@ void Bw_limit::Receive_Dominant_Frequency(int rank, MPI_Comm IO_WORLD) {
 		receiver.recv(&msg, ZMQ_DONTWAIT);
 
 		if (!msg.empty()) {
-			std::memcpy(&value, msg.data(), sizeof(double));
+			std::memcpy(&dominant_frequency, msg.data(), sizeof(double));
 		}
 	}
 
 	int root = 0;
 
-	MPI_Bcast(&value, 1, MPI_DOUBLE, 0, IO_WORLD);
+	MPI_Bcast(&dominant_frequency, 1, MPI_DOUBLE, 0, IO_WORLD);
 
-	if (value >= 0.0) {
-		ftio_freq_pred = value;
+	if (dominant_frequency > 0.0) {
+		ftio_phase_pred = 1.0 / dominant_frequency;
 	}
-
 }
 #endif

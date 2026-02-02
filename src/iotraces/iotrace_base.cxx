@@ -360,7 +360,7 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     if (Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
         std::filesystem::path* path = nullptr;
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
         path = file_tracker.get_request_path(request);
 #endif
         p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, path);
@@ -450,7 +450,7 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     if (Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
         std::filesystem::path* path = nullptr;
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
         path = file_tracker.get_request_path(request);
 #endif
         p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, path);
@@ -566,7 +566,7 @@ void IOtraceBase<Tag>::Open(const char *path, const FDType fd)
 {
     open = 1;
 
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
     Overhead_Start(MPI_Wtime() - t_0);
     file_tracker.track_file_opened(path, fd);
     Overhead_End();
@@ -593,7 +593,7 @@ void IOtraceBase<Tag>::Close(const FDType fd)
     {
         open = 0;
 
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
         Overhead_Start(MPI_Wtime() - t_0);
         file_tracker.track_file_closed(fd);
         Overhead_End();
@@ -902,33 +902,44 @@ void IOtraceBase<Tag>::Set(std::string flag, bool value)
 
 //! ---------------------- Bw limit with Custom MPI implementaiton -------------------
 //************************************************************************************
-//*                               Bw_limit
+//*                               apply_file_specific_bw
 //************************************************************************************
-
-#ifdef BW_LIMIT
+#if BW_LIMIT_GRANULARITY > 1
 template <typename Tag>
-void IOtraceBase<Tag>::Apply_Limit_Impl(bool write, FDType fd, long long transact_size)
+void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long long transact_size)
 {
     Overhead_Start(MPI_Wtime() - t_0);
     std::filesystem::path* path = nullptr;
-#if BW_FILE_SPECIFIC == 1
     path = file_tracker.get_fd_path(fd);
-#endif
-    bw_limit.Limit_Async(write, path, transact_size);
+    bw_limit.limit_by(write, path, transact_size);
     Overhead_End();
 }
 #endif
 
-//! ##### modify T and duration in case custom MPI version
+//! ---------------------- Bw limit with Custom MPI implementaiton -------------------
 //************************************************************************************
-//*                    Set custom MPI throughput values
+//*                               apply_bw_limit
 //************************************************************************************
-#if defined CUSTOM_MPI || defined BW_LIMIT
+#ifdef BW_LIMIT_GRANULARITY == 1
 template <typename Tag>
-void IOtraceBase<Tag>::Set_Custom_Throughput(void)
+void IOtrace<Tag>::apply_bw_limit(void)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    bw_limit.Set_Throughput();
+    bw_limit.limit_async();
+    Overhead_End();
+}
+#endif
+
+
+//! ##### modify T and duration in case custom MPI version
+//************************************************************************************
+//*                             apply_mpi_stats
+//************************************************************************************
+#ifdef CUSTOM_MPI
+template <typename Tag>
+void IOtrace<Tag>::set_custom_throughput(void){
+    Overhead_Start(MPI_Wtime() - t_0);
+    bw_limit.set_throughput();
     Overhead_End();
 }
 #endif

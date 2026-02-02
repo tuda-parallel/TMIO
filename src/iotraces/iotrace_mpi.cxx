@@ -170,10 +170,10 @@ void IOtraceMPI::Read_Sync_End(void)
     Read_Sync_End_Impl();
 }
 
-#ifdef BW_LIMIT
+#ifdef BW_LIMIT_GRANULARITY > 1
 //! ------------------------------ Apply BW limit -------------------------------
 //************************************************************************************
-//*                               2. Read_Sync_End
+//*                               2. apply_file_specific_bw
 //************************************************************************************
 /**
  * @brief sets limit for async transaction bandwidth
@@ -182,10 +182,9 @@ void IOtraceMPI::Read_Sync_End(void)
  * @param count [in] number of variables of datatype to be transfered
  * @param datatype [in] data type of the variables to be transfered
  */
-void IOtraceMPI::Apply_Limit(bool write, MPI_File fd, int count, MPI_Datatype datatype) {
-
+void IOtraceMPI::apply_file_specific_bw(bool write, MPI_File fd, int count, MPI_Datatype datatype) {
     MPI_Type_size(datatype, &data_size_write);
     long long transaction_bytes = static_cast<long long>(count) * data_size_write;
-    Apply_Limit_Impl(write, fd, transaction_bytes);
+    apply_file_specific_bw_impl(write, fd, transaction_bytes);
 }
 #endif

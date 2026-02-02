@@ -45,7 +45,7 @@ void IOdata::Mode(int r, bool a, bool b)
 void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
 {
 
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
     if (path) {
         path_to_io.try_emplace(*path).first->second.push_back(bandwidth_req.size());
     }
@@ -124,7 +124,7 @@ void IOdata::Clear_IO(void)
     t_req_e.clear();
     phases.clear();
     phase_data.clear();
-#if BW_FILE_SPECIFIC == 1
+#if BW_LIMIT_GRANULARITY > 1
     path_to_io.clear();
 #endif
 }
@@ -342,9 +342,8 @@ T IOdata::Max(std::vector<T> a)
 }
 template long long IOdata::Max<long long>(std::vector<long long>);
 
-#if defined (BW_LIMIT)
-#if BW_FILE_SPECIFIC == 1
-double IOdata::Get_Prev_File_BW(const std::filesystem::path& path)
+#if BW_LIMIT_GRANULARITY > 1
+double IOdata::get_prev_file_bw(const std::filesystem::path& path)
 {
     double res = -1.0;
     auto it = path_to_io.find(path);
@@ -356,8 +355,8 @@ double IOdata::Get_Prev_File_BW(const std::filesystem::path& path)
 }
 #endif
 
-#if BW_FILE_SCALING == 1
-long long IOdata::Get_Prev_File_Size(const std::filesystem::path& path)
+#if BW_LIMIT_GRANULARITY == 3
+long long IOdata::get_prev_file_size(const std::filesystem::path& path)
 {
     long long res = 0;
     auto it = path_to_io.find(path);
@@ -367,7 +366,6 @@ long long IOdata::Get_Prev_File_Size(const std::filesystem::path& path)
     }
     return res;
 }
-#endif
 #endif
 
 long long IOdata::count_opertaions(long long a)

@@ -83,7 +83,7 @@ private:
 	IOdata *p_sr;
 
 #if BW_LIMIT_FTIO == 1
-	double ftio_freq_pred;
+	double ftio_phase_pred;
 #endif
 
 #if defined BW_LIMIT
@@ -97,12 +97,12 @@ private:
 	double Bw;
 	double Br;
 
-	double Get_BW_Limit(const double, const double) const;
+	double calculate_bw_limit(const double, const double) const;
 	
 #endif // BW_LIMIT
 
-	double Get(Transaction_Type, std::string info) const;
-	void Set(Transaction_Type, std::string info, double value);
+	double get_phase_info(Transaction_Type, std::string info) const;
+	void set_phase_info(Transaction_Type, std::string info, double value);
 
 	template <VerbosityLevel Level>
 	inline void Log(const char *format, ...) const
@@ -123,14 +123,21 @@ public:
 	void Reset(void);
 	void Init(int, int, IOdata *, IOdata *, IOdata *, IOdata *);
 
-#if defined BW_LIMIT
-	void Limit_Async(bool, const std::filesystem::path *, long long);
+#if BW_LIMIT_GRANULARITY == 1
+	void limit_async();
+	void limit_async_impl(Transaction_Type);
 #endif
-#if defined CUSTOM_MPI || BW_LIMIT
-	void Set_Throughput(void);
+
+#if defined CUSTOM_MPI
+	void set_throughput();
 #endif
+
+#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
+	void set_throughput_impl(Transaction_Type);
+#endif
+
 #if BW_LIMIT_FTIO == 1
-	void Receive_Dominant_Frequency();
+	void receive_dominant_frequency(int, MPI_Comm);
 #endif
 };
 #endif // BW_LIMIT_H

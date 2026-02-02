@@ -107,11 +107,14 @@ public:
 	//*************************************
 	void Set(std::string, bool);
 
-#if defined BW_LIMIT
-	void Apply_Limit_Impl(bool, FDType, long long);
+#if BW_LIMIT_GRANULARITY > 1
+	void apply_file_specific_bw_impl(bool, FDType, long long);
 #endif
-#if defined CUSTOM_MPI || defined BW_LIMIT
-	void Set_Custom_Throughput(void);
+#ifdef BW_LIMIT_GRANULARITY == 1
+	void apply_bw_limit(void);
+#endif
+#ifdef CUSTOM_MPI
+	void set_custom_throughput(void);
 #endif
 
 protected:
@@ -166,12 +169,12 @@ protected:
 	IOdata *p_sw;
 	IOdata *p_sr;
 
-#if defined BW_LIMIT || defined CUSTOM_MPI
+#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
 	Bw_limit bw_limit;
-
-#if BW_FILE_SPECIFIC == 1
-	FileTracker<FDType, RequestIDType> file_tracker;
 #endif
+
+#if BW_LIMIT_GRANULARITY > 1
+	FileTracker<FDType, RequestIDType> file_tracker;
 #endif
 
 	char caller[12] = "\tIOtrace";
@@ -305,11 +308,17 @@ public:
 	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
 	void Read_Sync_End(void);
 
-#ifdef BW_LIMIT
 	//*************************************
 	//* MPI limit bandwidth
 	//*************************************
-	void Apply_Limit(bool write, MPI_File fd, int count, MPI_Datatype datatype);
+#if BW_LIMIT_GRANULARITY > 1
+	void apply_file_specific_bw(bool, FDType, long long);
+#endif
+#ifdef BW_LIMIT_GRANULARITY == 1
+	void apply_bw_limit(void);
+#endif
+#ifdef CUSTOM_MPI
+	void set_custom_throughput(void);
 #endif
 };
 

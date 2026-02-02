@@ -223,10 +223,15 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #ifndef TOL
 #define TOL 1.1
 #endif
-// Limit bandwidth based on previous transfers for this file
-#ifndef BW_FILE_SPECIFIC
-#define BW_FILE_SPECIFIC 1
+
+#ifndef BW_LIMIT_GRANULARITY
+#define BW_LIMIT_GRANULARITY 3
+// 0 No Limit
+// 1 By phase
+// 2 By file
+// 3 By file - scaled by transaction size
 #endif
+
 // Limit bandwidth based on file size difference
 #ifndef BW_FILE_SCALING
 #define BW_FILE_SCALING 1
