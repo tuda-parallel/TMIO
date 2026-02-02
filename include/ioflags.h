@@ -190,7 +190,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 //* Output File     
 //*******************************
 #ifndef FILE_FORMAT
-#define FILE_FORMAT 3
+#define FILE_FORMAT 0
 // 0 FILE_FORMAT "jsonl"
 // 1 FILE_FORMAT "binary" 
 // 2 FILE_FORMAT "msgpack" 

@@ -207,11 +207,13 @@ void IOtraceBase<Tag>::Summary(void)
 
     // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,MPI_Wtime() - t_0);
 
+#if BW_LIMIT_FTIO == 1
+    bw_limit.receive_dominant_frequency(rank, IO_WORLD);
+#endif
+
     //? Overhead calculation
     //?-------------------------
     double *time = Overhead_Calculation();
-
-    bw_limit.
 
     //? Print
     //?-------------------------
@@ -902,7 +904,7 @@ void IOtraceBase<Tag>::Set(std::string flag, bool value)
 
 //! ---------------------- Bw limit with Custom MPI implementaiton -------------------
 //************************************************************************************
-//*                               apply_file_specific_bw
+//*                         apply_file_specific_bw_impl
 //************************************************************************************
 #if BW_LIMIT_GRANULARITY > 1
 template <typename Tag>
@@ -911,7 +913,7 @@ void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long l
     Overhead_Start(MPI_Wtime() - t_0);
     std::filesystem::path* path = nullptr;
     path = file_tracker.get_fd_path(fd);
-    bw_limit.limit_by(write, path, transact_size);
+    bw_limit.limit_by_file(write, path, transact_size);
     Overhead_End();
 }
 #endif
@@ -920,9 +922,9 @@ void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long l
 //************************************************************************************
 //*                               apply_bw_limit
 //************************************************************************************
-#ifdef BW_LIMIT_GRANULARITY == 1
+#if BW_LIMIT_GRANULARITY == 1
 template <typename Tag>
-void IOtrace<Tag>::apply_bw_limit(void)
+void IOtraceBase<Tag>::apply_bw_limit(void)
 {
     Overhead_Start(MPI_Wtime() - t_0);
     bw_limit.limit_async();
@@ -937,7 +939,7 @@ void IOtrace<Tag>::apply_bw_limit(void)
 //************************************************************************************
 #ifdef CUSTOM_MPI
 template <typename Tag>
-void IOtrace<Tag>::set_custom_throughput(void){
+void IOtraceBase<Tag>::set_custom_throughput(void){
     Overhead_Start(MPI_Wtime() - t_0);
     bw_limit.set_throughput();
     Overhead_End();

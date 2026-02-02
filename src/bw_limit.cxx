@@ -1,5 +1,9 @@
 #include "bw_limit.h"
 
+#if BW_LIMIT_FTIO == 1 
+#include <zmq.hpp>
+#endif
+
 
 #if defined CUSTOM_MPI || defined BW_LIMIT
 extern long int EMPI_DATA_READ;
@@ -248,7 +252,7 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE,
 					scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
 
-				file_bw_limit = scaled_limit
+				file_bw_limit = scaled_limit;
 			} else {
 				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous transaction, no scaling applied");
 			}
@@ -257,10 +261,10 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 
 	if(transaction == Transaction_Type::Async_Write) {
 		bw_limit_iwrite += file_bw_limit;
-		EMPI_DESIRED_BW_IWRITE = desired_bw;
+		EMPI_DESIRED_BW_IWRITE = bw_limit_iwrite;
 	} else {
 		bw_limit_iread += file_bw_limit;
-		EMPI_DESIRED_BW_IREAD = desired_bw;
+		EMPI_DESIRED_BW_IREAD = bw_limit_iread;
 	}
 }
 
@@ -389,8 +393,8 @@ void Bw_limit::set_throughput(void)
  */
 double Bw_limit::set_throughput_impl(Transaction_Type tt)
 {
-	const long& empi_data = (tt == Transaction_Type::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
-	const long& empi_utime = (tt == Transaction_Type::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
+	long& empi_data = (tt == Transaction_Type::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
+	long& empi_utime = (tt == Transaction_Type::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
 
 	double phase_throughput = (static_cast<double>(empi_data)) / (static_cast<double>(empi_utime) / 1'000'000);
 

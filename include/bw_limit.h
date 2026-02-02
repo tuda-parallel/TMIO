@@ -123,17 +123,21 @@ public:
 	void Reset(void);
 	void Init(int, int, IOdata *, IOdata *, IOdata *, IOdata *);
 
-#if BW_LIMIT_GRANULARITY == 1
-	void limit_async();
-	void limit_async_impl(Transaction_Type);
-#endif
-
 #if defined CUSTOM_MPI
 	void set_throughput();
 #endif
 
 #if (defined BW_LIMIT) || (defined CUSTOM_MPI)
-	void set_throughput_impl(Transaction_Type);
+	double set_throughput_impl(Transaction_Type);
+#endif
+
+#if BW_LIMIT_GRANULARITY == 1
+	void limit_async();
+	void limit_async_impl(Transaction_Type);
+#endif
+
+#if BW_LIMIT_GRANULARITY > 1
+	void limit_by_file(bool, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size);
 #endif
 
 #if BW_LIMIT_FTIO == 1

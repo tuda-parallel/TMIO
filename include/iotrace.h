@@ -110,7 +110,7 @@ public:
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw_impl(bool, FDType, long long);
 #endif
-#ifdef BW_LIMIT_GRANULARITY == 1
+#if BW_LIMIT_GRANULARITY == 1
 	void apply_bw_limit(void);
 #endif
 #ifdef CUSTOM_MPI
@@ -312,9 +312,9 @@ public:
 	//* MPI limit bandwidth
 	//*************************************
 #if BW_LIMIT_GRANULARITY > 1
-	void apply_file_specific_bw(bool, FDType, long long);
+	void apply_file_specific_bw(bool, MPI_File, int, MPI_Datatype);
 #endif
-#ifdef BW_LIMIT_GRANULARITY == 1
+#if BW_LIMIT_GRANULARITY == 1
 	void apply_bw_limit(void);
 #endif
 #ifdef CUSTOM_MPI

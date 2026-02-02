@@ -170,7 +170,7 @@ void IOtraceMPI::Read_Sync_End(void)
     Read_Sync_End_Impl();
 }
 
-#ifdef BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 1
 //! ------------------------------ Apply BW limit -------------------------------
 //************************************************************************************
 //*                               2. apply_file_specific_bw
