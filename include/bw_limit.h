@@ -37,6 +37,12 @@ public:
 		return nullptr;
 	};
 
+	bool fd_valid(const FDType fd)
+	{
+		auto it = file_register.find(fd);
+		return it != file_register.end();
+	}
+
 	void register_request(const RequestIDType request_id, const FDType fd) 
 	{
 		auto it = file_register.find(fd);

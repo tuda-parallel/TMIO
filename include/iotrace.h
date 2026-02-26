@@ -19,6 +19,10 @@
 #include "bw_limit.h"
 #endif
 
+#ifdef PREFETCH
+#include "prefetch.h"
+#endif
+
 /**
  *  IO trace class
  * @file   iotrace.h
@@ -171,6 +175,10 @@ protected:
 
 #if (defined BW_LIMIT) || (defined CUSTOM_MPI)
 	Bw_limit bw_limit;
+#endif
+
+#ifdef PREFETCH
+	Prefetcher prefetcher;
 #endif
 
 #if BW_LIMIT_GRANULARITY > 1
