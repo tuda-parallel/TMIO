@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unordered_map>
 #include <filesystem>
+#include <shared_mutex>
+#include <mutex>
 #include "ioprint.h"
 
 /**
@@ -24,22 +26,23 @@
     *
     */
 class IOdata{
-
-public: 
-    enum class Transaction_Type {
+public:
+    enum class TransactionType {
         Async_Write,
         Async_Read,
         Sync_Write,
         Sync_Read,
     };
 
+private:
+    
     //* Variables:
     //************
     int  rank;                // current rank
-    bool phase;
-    bool a_or_s_flag; // true = async | false = sync         
-    bool w_or_r_flag; // true = write | false = read         
-
+    TransactionType transaction_type;  // type of transaction this data belongs to
+    mutable std::shared_mutex phase_data_lock; // FIX: More fine grained locking
+    const char* transaction_identifier;
+    
     //*******************************
     //* I/O information during phase
     //*******************************
@@ -51,26 +54,27 @@ public:
     std:: vector<double>    t_req_e;  // required end time
     std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-#if BW_LIMIT_GRANULARITY > 1 || PREFETCH
+    #if BW_LIMIT_GRANULARITY > 1 || PREFETCH
     std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io;   // I/O operations for each file
-#endif
+    #endif
     //*******************************
     //* Phase information 
     //*******************************   
-    std:: vector<collect>   phase_data;
+    bool phase;
+    std:: vector<collect> phase_data;
+public:
     collect tmp;
-    
+
     //* Methods:
     //************
     IOdata();
-    void Mode(int,bool,bool=true); // set if read or write and if actual or required
+    void Mode(int,TransactionType); // set if read or write and if actual or required
     //? phase start
-    void Phase_Start(bool, double,long long,long long );
+    void Phase_Start(bool,double,long long,long long );
     
-    //? add I/O tracr or claer all I/O traces
-    void Add_IO_Act(long long,double,double);
-    void Add_IO_Req(long long,double,double, const std::filesystem::path*);
+    //? clear all I/O traces
     void Clear_IO(void);
+    void Add_IO_Act(long long,double,double);
     
     //? for Async tracing 
     void Phase_End_Act(long long,double,double,bool);
@@ -85,6 +89,24 @@ public:
     template <class T>
     T Max(std::vector<T>);
 
+    std::vector<double> get_bandwidth_act();
+    std::vector<double> get_bandwidth_req();
+    std::vector<double> get_t_act_s();
+    std::vector<double> get_t_act_e();
+    std::vector<double> get_t_req_s();
+    std::vector<double> get_t_req_e();
+    
+    void gather_phase_data(MPI_Datatype, collect*, int*, int*, MPI_Comm);
+    void clear_phase_data();
+
+    TransactionType get_transaction_type();
+    const char* type_string(TransactionType);
+    bool is_async();
+    bool is_write();
+    double get_last_phase_info(std::string);
+    void set_last_phase_info(std::string, double);
+    size_t get_phase_count();
+
 #if BW_LIMIT_GRANULARITY > 1
     double get_prev_file_bw(const std::filesystem::path&);
 #endif
@@ -94,18 +116,19 @@ public:
     
     //? calucalte the Bandwidth after the application finishes
     void Bandwidth_In_Phase_Offline(void);
-    
-    //? Debug
-    void Debug_Info_Bandwidth_In_Phase(void);
-
 
 private: 
     char caller[12] = "\tIOdata "; // name of the class
-    char w_or_r[6];   // write or read
-    char a_or_s[6];   // async or sync
     long long count_opertaions(long long); //counts operation in a phase
     long long count_opertaions_agg(long long);  //counts all operations bellow input
     long long online_counter;
+
+    //? add I/O traces
+    void Add_IO_Act_Impl(long long,double,double);
+    void Add_IO_Req(long long,double,double, const std::filesystem::path*);
+
+    //? Debug
+    void Debug_Info_Bandwidth_In_Phase(void);
 };
 
 #endif // IO_DATA_H

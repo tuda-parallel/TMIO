@@ -5,11 +5,14 @@
 #include <map>
 #include <filesystem>
 #include <cstdarg>
+#include <mutex>
 
-using Transaction_Type = IOdata::Transaction_Type;
+using TransactionType = IOdata::TransactionType;
 
 template<typename FDType, typename RequestIDType>
 class [[maybe_unused]] FileTracker {
+
+	//TODO: make this threadsafe
 private:
 	std::map<FDType, std::filesystem::path> file_register;
 	std::map<RequestIDType, std::filesystem::path> request_register;
@@ -74,6 +77,7 @@ class Bw_limit
 {
 
 private:
+	std::mutex bw_lock;
 	char caller[12] = "\tBw_limit";
 	int rank;
 	int processes;
@@ -107,8 +111,8 @@ private:
 	
 #endif // BW_LIMIT
 
-	double get_phase_info(Transaction_Type, std::string info) const;
-	void set_phase_info(Transaction_Type, std::string info, double value);
+	double get_phase_info(TransactionType, std::string info) const;
+	void set_phase_info(TransactionType, std::string info, double value);
 
 	template <VerbosityLevel Level>
 	inline void Log(const char *format, ...) const
@@ -122,6 +126,14 @@ private:
 		}
 	};
 
+#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
+	double set_throughput_impl(TransactionType);
+#endif
+
+#if BW_LIMIT_GRANULARITY == 1
+	void limit_async_impl(TransactionType);
+#endif
+
 public:
 	Bw_limit();
 	~Bw_limit();
@@ -133,13 +145,8 @@ public:
 	void set_throughput();
 #endif
 
-#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
-	double set_throughput_impl(Transaction_Type);
-#endif
-
 #if BW_LIMIT_GRANULARITY == 1
 	void limit_async();
-	void limit_async_impl(Transaction_Type);
 #endif
 
 #if BW_LIMIT_GRANULARITY > 1
@@ -149,5 +156,6 @@ public:
 #if BW_LIMIT_FTIO == 1
 	void receive_dominant_frequency(int, MPI_Comm);
 #endif
+
 };
 #endif // BW_LIMIT_H

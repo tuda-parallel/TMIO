@@ -14,6 +14,7 @@
 void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
     double start_time = MPI_Wtime() - t_0;
+    int data_size_write;
     MPI_Type_size(datatype, &data_size_write);
     long long total_size = static_cast<long long>(count) * data_size_write;
 
@@ -66,6 +67,8 @@ void IOtraceMPI::Write_Async_Required(MPI_Request *request)
  */
 void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
 {
+    int data_size_read;
+
     double start_time = MPI_Wtime() - t_0;
     MPI_Type_size(datatype, &data_size_read);
     long long total_size = static_cast<long long>(count) * data_size_read;
@@ -75,7 +78,7 @@ void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request 
         static long int counter = 1;
         IOtraceMPI::Log<VerbosityLevel::BASIC_LOG>(
             "%s > rank %i > #%li will asnyc read %i x %i = %lli bytes \n",
-                    caller, rank, counter++, count, data_size_read, async_read_size.back()); });
+                    caller, rank, counter++, count, data_size_read, total_size); });
 
     Read_Async_Start_Impl(request, total_size, offset, start_time);
 }
@@ -122,6 +125,7 @@ void IOtraceMPI::Write_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset o
     double start_time = MPI_Wtime() - t_0;
     t_sync_write_start = Overhead_Start(start_time);
 
+    int data_size_write;
     MPI_Type_size(datatype, &data_size_write);
     size_sync_write = static_cast<long long>(count) * data_size_write;
     Write_Sync_Start_Impl(size_sync_write, offset, start_time);
@@ -154,6 +158,7 @@ void IOtraceMPI::Read_Sync_Start(int count, MPI_Datatype datatype, MPI_Offset of
     double start_time = MPI_Wtime() - t_0;
     t_sync_read_start = Overhead_Start(start_time);
     
+    int data_size_read;
     MPI_Type_size(datatype, &data_size_read);
     size_sync_read = static_cast<long long>(count) * data_size_read;
     Read_Sync_Start_Impl(size_sync_read, offset, start_time);
@@ -183,6 +188,7 @@ void IOtraceMPI::Read_Sync_End(void)
  * @param datatype [in] data type of the variables to be transfered
  */
 void IOtraceMPI::apply_file_specific_bw(bool write, MPI_File fd, int count, MPI_Datatype datatype) {
+    int data_size_write;
     MPI_Type_size(datatype, &data_size_write);
     long long transaction_bytes = static_cast<long long>(count) * data_size_write;
     apply_file_specific_bw_impl(write, fd, transaction_bytes);

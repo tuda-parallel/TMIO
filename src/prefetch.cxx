@@ -15,10 +15,8 @@ Prefetcher::Prefetcher() : inititalized(false) {
 void Prefetcher::init(IOdata* p_ar, IOdata* p_sr)
 {
 #if DEBUG == 1
-    assert(p_ar->w_or_r_flag == false);
-    assert(p_ar->a_or_s_flag == true);
-    assert(p_sr->w_or_r_flag == false);
-    assert(p_ar->a_or_s_flag == false);
+    assert(p_ar->get_transaction_type() == IOdata::TransactionType::Async_Read);
+    assert(p_sr->get_transaction_type() == IOdata::TransactionType::Sync_Read);
 #endif
 
     data_async_read = p_ar;
@@ -128,6 +126,8 @@ int Prefetcher::retrieve_read_snyc(CallSignature& cs, void* target_buffer, MPI_S
         }
         return err;
     } else {
+        Prefetcher::Log<VerbosityLevel::DETAILED_LOG>(
+            "Prefetch miss on sync read. Fetching read manually");
         return PMPI_File_read(cs.fh, target_buffer, cs.count, cs.type, status);
     }
 }

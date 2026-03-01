@@ -96,22 +96,22 @@ void Bw_limit::Reset(void)
  * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
  * @return double
  */
-double Bw_limit::get_phase_info(Transaction_Type mode, std::string info) const
+double Bw_limit::get_phase_info(TransactionType mode, std::string info) const
 {
 	double res;
 	switch (mode)
 	{
-		case Transaction_Type::Async_Write:
-			res = (p_aw->phase_data.empty()) ? -1.0 : p_aw->phase_data.back().get(info);
+		case TransactionType::Async_Write:
+			res = p_aw->get_last_phase_info(info);
 			break;
-		case Transaction_Type::Async_Read:
-			res = (p_ar->phase_data.empty()) ? -1.0 : p_ar->phase_data.back().get(info);
+		case TransactionType::Async_Read:
+			res = p_ar->get_last_phase_info(info);
 			break;
-		case Transaction_Type::Sync_Read:
-			res = (p_sr->phase_data.empty()) ? -1.0 : p_sr->phase_data.back().get(info);
+		case TransactionType::Sync_Read:
+			res = p_sr->get_last_phase_info(info);
 			break;
-		case Transaction_Type::Sync_Write:
-			res = (p_sw->phase_data.empty()) ? -1.0 : p_sw->phase_data.back().get(info);
+		case TransactionType::Sync_Write:
+			res = p_sw->get_last_phase_info(info);
 			break;
 	}
 	return res;
@@ -127,25 +127,21 @@ double Bw_limit::get_phase_info(Transaction_Type mode, std::string info) const
  * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
  * @param value value assigned to the variable
  */
-void Bw_limit::set_phase_info(Transaction_Type mode, std::string info, double value)
+void Bw_limit::set_phase_info(TransactionType mode, std::string info, double value)
 {
 	switch (mode)
 	{
-		case Transaction_Type::Async_Write:
-			if (!p_aw->phase_data.empty())
-				p_aw->phase_data.back().set(info, value);
+		case TransactionType::Async_Write:
+			p_aw->set_last_phase_info(info, value);
 			break;
-		case Transaction_Type::Async_Read:
-			if (!p_ar->phase_data.empty())
-				p_ar->phase_data.back().set(info, value);
+		case TransactionType::Async_Read:
+			p_ar->set_last_phase_info(info, value);
 			break;
-		case Transaction_Type::Sync_Read:
-			if (!p_sr->phase_data.empty())
-				p_sr->phase_data.back().set(info, value);
+		case TransactionType::Sync_Read:
+			p_sr->set_last_phase_info(info, value);
 			break;
-		case Transaction_Type::Sync_Write:
-			if (!p_sw->phase_data.empty())
-				p_sw->phase_data.back().set(info, value);
+		case TransactionType::Sync_Write:
+			p_sw->set_last_phase_info(info, value);
 			break;
 	}
 }
@@ -159,6 +155,8 @@ void Bw_limit::set_phase_info(Transaction_Type mode, std::string info, double va
  */
 void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata *p_sw, IOdata *p_sr)
 {
+	std::lock_guard lock(bw_lock);
+
 	this->p_aw = p_aw;
 	this->p_ar = p_ar;
 	this->p_sw = p_sw;
@@ -208,21 +206,23 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 
 void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size)
 {
-	if (p_aw->phase_data.size() > counter_iwrite) {
-		set_throughput_impl(Transaction_Type::Async_Write);
+	std::lock_guard lock(bw_lock);
+
+	if (size_t phase_count = p_aw->get_phase_count(); phase_count > counter_iwrite) {
+		set_throughput_impl(TransactionType::Async_Write);
 		bw_limit_iwrite = 0.0;
-		counter_iwrite = p_aw->phase_data.size();
-	} 
+		counter_iwrite = phase_count;
+	}
 	
-	if (p_ar->phase_data.size() > counter_iread) {
-		set_throughput_impl(Transaction_Type::Async_Read);
+	if (size_t phase_count = p_ar->get_phase_count(); phase_count > counter_iread) {
+		set_throughput_impl(TransactionType::Async_Read);
 		bw_limit_iwrite = 0.0;
-		counter_iread = p_ar->phase_data.size();
+		counter_iread = phase_count;
 	}
 
 	double file_measured_bw = 0.0;
 
-	Transaction_Type transaction = write? Transaction_Type::Async_Write : Transaction_Type::Async_Read;
+	TransactionType transaction = write? TransactionType::Async_Write : TransactionType::Async_Read;
 	IOdata* p_data = write? p_aw : p_ar;
 
 	
@@ -259,7 +259,7 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 		}
 	}
 
-	if(transaction == Transaction_Type::Async_Write) {
+	if(transaction == TransactionType::Async_Write) {
 		bw_limit_iwrite += file_bw_limit;
 		EMPI_DESIRED_BW_IWRITE = bw_limit_iwrite;
 	} else {
@@ -280,20 +280,20 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
  * @brief Limits I/O through extern MPI.
  */
 void Bw_limit::limit_async() {
-	Transaction_Type transaction;
+	std::lock_guard lock(bw_lock);
 	
-	if (p_aw->phase_data.size() > counter_iwrite) {
+	if (size_t phase_count = p_aw->get_phase_count(); phase_count > counter_iwrite) {
 		
-		limit_async_impl(Transaction_Type::Async_Write);
-		counter_iwrite = p_aw->phase_data.size();
-	} else if (p_ar->phase_data.size() > counter_iread) {
+		limit_async_impl(TransactionType::Async_Write);
+		counter_iwrite = phase_count;
+	} else if (size_t phase_count = p_ar->get_phase_count(); phase_count > counter_iread) {
 
-		limit_async_impl(Transaction_Type::Async_Read);
-		counter_iread = p_ar->phase_data.size();
+		limit_async_impl(TransactionType::Async_Read);
+		counter_iread = phase_count;
 	}
 }
 
-void Bw_limit::limit_async_impl(Transaction_Type transaction) {
+void Bw_limit::limit_async_impl(TransactionType transaction) {
 	double phase_throughput = set_throughput_impl(transaction);
 
 	double measured_bw = 0.0;
@@ -308,24 +308,24 @@ void Bw_limit::limit_async_impl(Transaction_Type transaction) {
 		measured_bw = Bw_limit::get_phase_info(transaction, "B_sum");
 	}
 
-	double& prev_bw_limit = (transaction == Transaction_Type::Async_Write)? bw_limit_iwrite : bw_limit_iread;
+	double& prev_bw_limit = (transaction == TransactionType::Async_Write)? bw_limit_iwrite : bw_limit_iread;
 
 	const double desired_bw = calculate_bw_limit(measured_bw, prev_bw_limit);
 
 	if (desired_bw != prev_bw_limit) {
 		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW old goal: %.2f Mb/s   BW: %.2f Mb/s   BW new goal: %.2f Mb/s%s\n",
-			caller, rank, processes - 1, GREEN, (transaction == Transaction_Type::Async_Write)? "async_write" : "async_read", BLUE,
+			caller, rank, processes - 1, GREEN, (transaction == TransactionType::Async_Write)? "async_write" : "async_read", BLUE,
 			prev_bw_limit / 1'000'000, phase_throughput / 1'000'000, desired_bw / 1'000'000, BLACK);
 
 		prev_bw_limit = desired_bw;
 	}
 	else {
 		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW old goal: %.2f Mb/s   BW: %.2f Mb/s %s\n",
-			caller, rank, processes - 1, GREEN, (transaction == Transaction_Type::Async_Write)? "async_write" : "async_read", BLUE,
+			caller, rank, processes - 1, GREEN, (transaction == TransactionType::Async_Write)? "async_write" : "async_read", BLUE,
 			desired_bw / 1'000'000, phase_throughput / 1'000'000, BLACK);
 	}
 
-	if(transaction == Transaction_Type::Async_Write) {
+	if(transaction == TransactionType::Async_Write) {
 		EMPI_DESIRED_BW_IWRITE = desired_bw;
 	} else {
 		EMPI_DESIRED_BW_IREAD = desired_bw;
@@ -371,14 +371,16 @@ double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_
  */
 void Bw_limit::set_throughput(void)
 {
-	if (p_aw->phase_data.size() > counter_iwrite) {
-		set_throughput_impl(Transaction_Type::Async_Write);
-		counter_iwrite = p_aw->phase_data.size();
+	std::lock_guard lock(bw_lock);
+
+	if (size_t phase_count = p_aw->get_phase_count(); phase_count > counter_iwrite) {
+		set_throughput_impl(TransactionType::Async_Write);
+		counter_iwrite = phase_count;
 	} 
 	
-	if (p_ar->phase_data.size() > counter_iread) {
-		set_throughput_impl(Transaction_Type::Async_Read);
-		counter_iread = p_ar->phase_data.size();
+	if (size_t phase_count = p_ar->get_phase_count(); phase_count > counter_iread) {
+		set_throughput_impl(TransactionType::Async_Read);
+		counter_iread = phase_count;
 	}
 }
 #endif
@@ -391,10 +393,10 @@ void Bw_limit::set_throughput(void)
  * @brief assigns throughput through custom MPI version for one transaction type
  * @param tt type of transaction to asign throughput to
  */
-double Bw_limit::set_throughput_impl(Transaction_Type tt)
+double Bw_limit::set_throughput_impl(TransactionType tt)
 {
-	long& empi_data = (tt == Transaction_Type::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
-	long& empi_utime = (tt == Transaction_Type::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
+	long& empi_data = (tt == TransactionType::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
+	long& empi_utime = (tt == TransactionType::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
 
 	double phase_throughput = (static_cast<double>(empi_data)) / (static_cast<double>(empi_utime) / 1'000'000);
 
@@ -405,7 +407,7 @@ double Bw_limit::set_throughput_impl(Transaction_Type tt)
 		Bw_limit::get_phase_info(tt, "t_start") + static_cast<double>(empi_utime) / 1'000'000);
 
 	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> T set to(%.2f) Mb/s %s\n",
-			caller, rank, processes - 1, YELLOW, (tt == Transaction_Type::Async_Write)? "async_write" : "async_read",
+			caller, rank, processes - 1, YELLOW, (tt == TransactionType::Async_Write)? "async_write" : "async_read",
 			BLUE, phase_throughput / 1'000'000, BLACK);
 
 	empi_data = 0;
@@ -425,6 +427,7 @@ double Bw_limit::set_throughput_impl(Transaction_Type tt)
  *
  */
 void Bw_limit::receive_dominant_frequency(int rank, MPI_Comm IO_WORLD) {
+	std::lock_guard lock(bw_lock);
 
 	double dominant_frequency = -1.0;
 

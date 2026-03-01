@@ -124,34 +124,28 @@ public:
 protected:
 	int rank;			 // current MPI rank
 	int processes;		 // number of ranks
-	double open;		 // flag indicating file status
-	int data_size_read;	 // store size of variable for read
-	int data_size_write; // store size of variable for write
+	bool open;		 	 // flag indicating file status
 
-	// FIXME: Use function local varaibel to replace the global ones for multiple threads
-	double t_async_write_start; // time stamp for start of async write operation
-	double t_sync_write_start;	// time stamp for start of sync write operation
-	double t_async_read_start;	// time stamp for start of async read operation
-	double t_sync_read_start;	// time stamp for start of sync read operation
-	double t_sync_read_end;
-	double t_sync_write_end;
+	// FIXME: Use function local varaibel to replace the thread_local ones
+	thread_local double t_sync_write_start = std::numeric_limits<double>::quiet_NaN();	// time stamp for start of sync write operation
+	thread_local double t_sync_read_start = std::numeric_limits<double>::quiet_NaN();	// time stamp for start of sync read operation
+	thread_local double t_sync_read_end = std::numeric_limits<double>::quiet_NaN();
+	thread_local double t_sync_write_end = std::numeric_limits<double>::quiet_NaN();
 
-	// FIXME: Use function local varaibel to replace the global ones for multiple threads
-	long long size_async_write; // size of async write operation in KB
-	long long size_sync_write;	// size of sync write operation in KB
-	long long size_async_read;	// size of async read operation in KB
-	long long size_sync_read;	// size of async read operation in KB
+	// FIXME: Use function local varaibel to replace the thread_local ones
+	thread_local long long size_sync_write = 0;	// size of sync write operation in KB
+	thread_local long long size_sync_read = 0;	// size of async read operation in KB
 
 	double t_0;						// start time of app (for each rank)
-	double delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
-	double t_overhead = 0;			// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
-	double delta_t_io_overhead = 0; // elapsed in-period overhead during io tracing since last IOtrace::Summary calling (for each rank)
+	std::atomic<double> delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
+	thread_local double t_overhead = 0;			// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
+	std::atomic<double> delta_t_io_overhead = 0; // elapsed in-period overhead during io tracing since last IOtrace::Summary calling (for each rank)
 	double t_summary = 0;			// elapsed time (for each rank) FIXME: Looks should be the MPI_Wtime when last time IOtrace::Summary is finishing its called
 
 	bool online_file_generation = false; // elapsed time (for each rank)
 	bool finalize = false;
 
-	// FIXME: Add pthread lock to protect the following variables
+	// FIXME: Add more fine grained locking
 	// ques for async tracing
 	std::vector<double> async_write_time;
 	std::vector<long long> async_write_size;

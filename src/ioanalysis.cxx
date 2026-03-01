@@ -94,7 +94,7 @@ collect *ioanalysis::Gather_Collect(IOdata *iodata, int *n, int rank, int proces
 	}
 
 	// gather collected data
-	MPI_Gatherv(&iodata->phase_data[0], iodata->phase_data.size(), GATHER_collect, all_data, n, displacement, GATHER_collect, 0, IO_WORLD);
+	iodata->gather_phase_data(GATHER_collect, all_data, n, displacement, IO_WORLD);
 
 	// clean up
 	if (rank == 0)
@@ -102,7 +102,7 @@ collect *ioanalysis::Gather_Collect(IOdata *iodata, int *n, int rank, int proces
 
 	// remove unneeded elements
 	if (finilize)
-		iodata->phase_data.clear();
+		iodata->clear_phase_data();
 
 	// clean after the code has been executed 4 time (one for each mode: async/sync write/read)
 	if (counter == 4)
@@ -233,31 +233,23 @@ int *ioanalysis::Get_N_From_ALL_N(IOdata *iodata, n_struct *all_n, int rank, int
 	{
 		// find number of elements:
 		n = (int *)malloc(sizeof(int) * processes);
-		if (iodata->a_or_s_flag)
+		switch (iodata->get_transaction_type())
 		{
-			if (iodata->w_or_r_flag)
-			{
-				for (int i = 0; i < processes; i++)
+		case IOdata::TransactionType::Async_Write:
+			for (int i = 0; i < processes; i++)
 					n[i] = all_n[i].aw;
-			}
-			else
-			{
-				for (int i = 0; i < processes; i++)
+			break;
+		case IOdata::TransactionType::Async_Read:
+			for (int i = 0; i < processes; i++)
 					n[i] = all_n[i].ar;
-			}
-		}
-		else
-		{
-			if (iodata->w_or_r_flag)
-			{
-				for (int i = 0; i < processes; i++)
+			break;
+		case IOdata::TransactionType::Sync_Write:
+			for (int i = 0; i < processes; i++)
 					n[i] = all_n[i].sw;
-			}
-			else
-			{
-				for (int i = 0; i < processes; i++)
+			break;
+		case IOdata::TransactionType::Sync_Read:
+			for (int i = 0; i < processes; i++)
 					n[i] = all_n[i].sr;
-			}
 		}
 	}
 
