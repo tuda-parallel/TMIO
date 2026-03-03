@@ -243,8 +243,8 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 
 
-#ifdef PREFETCH
-
+#ifndef PREFETCH
+#define PREFETCH 1 // If set to 1, prefetch MPI calls
 #endif
 
 

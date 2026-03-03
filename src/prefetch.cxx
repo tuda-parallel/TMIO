@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cassert>
+#include <iotrace.h>
 
 Prefetcher::Prefetcher() : inititalized(false) {
 
@@ -12,30 +13,20 @@ Prefetcher::Prefetcher() : inititalized(false) {
 /**
  * @brief Initializes prefetching and spawns asnyc prefetch thread
  */
-void Prefetcher::init(IOdata* p_ar, IOdata* p_sr)
+void Prefetcher::init(IOtraceMPI *mpi_iotrace, int *mpi_provided)
 {
-#if DEBUG == 1
-    assert(p_ar->get_transaction_type() == IOdata::TransactionType::Async_Read);
-    assert(p_sr->get_transaction_type() == IOdata::TransactionType::Sync_Read);
-#endif
-
-    data_async_read = p_ar;
-    data_sync_read = p_sr;
-
     //test if MPI multithreading enabled
-    int mpi_provided = 0;
-    MPI_Query_thread(&mpi_provided);
-
-    if(mpi_provided != MPI_THREAD_MULTIPLE) {
+    if(*mpi_provided != MPI_THREAD_MULTIPLE) {
         Prefetcher::Log<VerbosityLevel::BASIC_LOG>(
             "MPI multithreading not activated. I/O prefetching deactivated.");
         return;
     }
 
+    traces = mpi_iotrace;
     callDBs = std::make_shared<CallDB>();
     requests_in_transit = std::make_shared<RequestsInTransit>();
 
-    std::thread([&] {Prefetcher::prefetching_routine(requests_in_transit, callDBs);}).detach();
+    std::thread([&] {Prefetcher::prefetching_routine(requests_in_transit, callDBs, mpi_iotrace);}).detach();
     inititalized = true;
 }
 
@@ -49,62 +40,78 @@ int Prefetcher::retrieve_read_asnyc(CallSignature& cs, MPI_Request* mpi_request,
 {
     std::vector<std::byte> prefetch_buffer;
 
+    int err;
     if (take_prefetched_by_call_signature(cs, mpi_request, prefetch_buffer)) {
         AsyncBuffers buffers = {std::move(prefetch_buffer), target_buffer};
 
         async_requests.emplace(mpi_request, buffers);
 
-        return MPI_SUCCESS;
+        err = MPI_SUCCESS;
     } else {
         Prefetcher::Log<VerbosityLevel::DETAILED_LOG>(
             "Prefetch miss. Fetching read manually");
-        return PMPI_File_iread_at(cs.fh, cs.offset, target_buffer, cs.count, cs.type, mpi_request);
+        traces->Read_Async_Start(cs.count, cs.type, mpi_request, cs.offset);
+        err = PMPI_File_iread_at(cs.fh, cs.offset, target_buffer, cs.count, cs.type, mpi_request);
     }
+
+    request_signature[mpi_request] = cs;
+    return err;
 }
 
 /**
- * @brief Wait for results from prefetch
+ * @brief Copy results of transaction into buffer
  * @param request Signature of the retrieved call
- * @param mpi_status [out] Returns status of MPI_Wait
+ * @param int Status of the MPI call
  * @return MPI error value
  */
-int Prefetcher::fetch_read_async_wait(MPI_Request* request, MPI_Status* status) {
+void Prefetcher::fetch_read_async_wait(MPI_Request* request, int err) {
+    if (err != MPI_SUCCESS) return;
+
     auto it = std::find(async_requests.begin(), async_requests.end(), request);
 
-    int err = PMPI_Wait(request, status);
-
-    if(err == MPI_SUCCESS && it != async_requests.end()) {
+    if(it != async_requests.end()) {
         std::memcpy(it->second.target_buffer,
             it->second.prefetch_buffer.data(), it->second.prefetch_buffer.size());
 
         async_requests.erase(it);
     }
 
-    return err;
+    auto rs = request_signature.find(request);
+    if (rs != request_signature.end())
+    {
+        double time_req = MPI_Wtime();
+        register_transaction(rs->second, time_req);
+        request_signature.erase(rs);
+    }
 }
 
 /**
- * @brief Test for results from prefetch
+ * @brief Copy results of successful test into buffer
  * @param request Signature of the retrieved call
  * @param flag true if test successfull
- * @param mpi_status [out] Returns status of MPI_Wait
+ * @param int Status of the MPI call
  * @return MPI error value
  */
-int Prefetcher::fetch_read_async_test(MPI_Request* request, int* flag, MPI_Status* status) {
-    int err = MPI_Test(request, flag, status);
-    
-    if(*flag && err == MPI_SUCCESS) {
-        auto it = std::find(async_requests.begin(), async_requests.end(), request);
+void Prefetcher::fetch_read_async_test(MPI_Request* request, int* flag, int err) {  
+    if(!*flag || err != MPI_SUCCESS) return;
 
-        if (it != async_requests.end()) {
-            std::memcpy(it->second.target_buffer,
-                it->second.prefetch_buffer.data(), it->second.prefetch_buffer.size());
+    auto it = std::find(async_requests.begin(), async_requests.end(), request);
 
-            async_requests.erase(it);
-        }
+    if (it != async_requests.end()) {
+        std::memcpy(it->second.target_buffer,
+            it->second.prefetch_buffer.data(), it->second.prefetch_buffer.size());
+
+        async_requests.erase(it);
+    }
+
+    auto rs = request_signature.find(request);
+    if (rs != request_signature.end())
+    {
+        double time_req = MPI_Wtime();
+        register_transaction(rs->second, time_req);
+        request_signature.erase(rs);
     }
     
-    return err;
 }
 
 /**
@@ -119,17 +126,25 @@ int Prefetcher::retrieve_read_snyc(CallSignature& cs, void* target_buffer, MPI_S
     MPI_Request mpi_request;
     std::vector<std::byte> prefetch_buffer;
 
+    double time_req = MPI_Wtime();
+
+    int err;
     if (take_prefetched_by_call_signature(cs, &mpi_request, prefetch_buffer)) {
-        int err = MPI_Wait(&mpi_request, status);
+        err = MPI_Wait(&mpi_request, status);
         if(err == MPI_SUCCESS) {
             std::memcpy(target_buffer, prefetch_buffer.data(), prefetch_buffer.size());
         }
-        return err;
+        
     } else {
         Prefetcher::Log<VerbosityLevel::DETAILED_LOG>(
             "Prefetch miss on sync read. Fetching read manually");
-        return PMPI_File_read(cs.fh, target_buffer, cs.count, cs.type, status);
+        traces->Read_Sync_Start(cs.count, cs.type, cs.offset);
+        err = PMPI_File_read(cs.fh, target_buffer, cs.count, cs.type, status);
+        traces->Read_Sync_End();
     }
+
+    register_transaction(cs, time_req);
+    return err;
 }
 
 /**
@@ -164,14 +179,12 @@ bool Prefetcher::take_prefetched_by_call_signature(CallSignature& cs, MPI_Reques
  * @param time_req Time stamp, when result of transaction is required
  * @param prev_call_count Times transactions to this file have been called
  */
-void Prefetcher::register_transaction(CallSignature &cs, double time_req, int prev_call_count)
+void Prefetcher::register_transaction(CallSignature &cs, double time_req)
 {
-    // TODO when is this actually called?
-
     int type_size;
     int err = MPI_Type_size(cs.type, &type_size);
 
-    if(prev_call_count < 2 || err != MPI_SUCCESS || type_size * cs.count > max_file_size_bytes) {
+    if(err != MPI_SUCCESS || type_size * cs.count > max_file_size_bytes) {
         return;
     }
 
@@ -205,7 +218,7 @@ void Prefetcher::register_transaction(CallSignature &cs, double time_req, int pr
  * @param rit Contains requests that are currently pending
  * @param cdb Information about calls
  */
-void Prefetcher::prefetching_routine(std::shared_ptr<RequestsInTransit> rit, std::shared_ptr<CallDB> cdb) 
+void Prefetcher::prefetching_routine(std::shared_ptr<RequestsInTransit> rit, std::shared_ptr<CallDB> cdb, IOtraceMPI* traces) 
 {
     //TODO Check for max chache size
     std::optional<MPI_File> next_prefetch;
@@ -214,7 +227,7 @@ void Prefetcher::prefetching_routine(std::shared_ptr<RequestsInTransit> rit, std
             std::lock_guard<std::mutex> lock(cdb->call_lock);
             auto it = cdb->prefetch_infos.find(*next_prefetch);
             if(it != cdb->prefetch_infos.end()) {
-                prefetch_transaction(it->second.cs, rit);
+                prefetch_transaction(it->second.cs, rit, traces);
             }
         } else { // Wait on new prefetch info to arrive
             std::unique_lock<std::mutex> lock(cdb->event_mutex);
@@ -241,10 +254,9 @@ void Prefetcher::prefetching_routine(std::shared_ptr<RequestsInTransit> rit, std
  * @param cs Signature of the prefetched call
  * @param rit MPI_Request associated with prefetch call
  */
-void Prefetcher::prefetch_transaction(CallSignature& cs, std::shared_ptr<RequestsInTransit>& rit)
+void Prefetcher::prefetch_transaction(CallSignature& cs, std::shared_ptr<RequestsInTransit>& rit, IOtraceMPI* traces)
 {
-    // TODO BW Limit 
-    // create buffer
+    // TODO BW Limit
     int type_size = 0;
     auto err = MPI_Type_size(cs.type, &type_size);
 
@@ -253,6 +265,10 @@ void Prefetcher::prefetch_transaction(CallSignature& cs, std::shared_ptr<Request
     
     std::vector<std::byte> prefetch_buffer(type_size * cs.count);
     MPI_Request mpi_request;
+
+    if constexpr (BW_LIMIT_GRANULARITY > 1)
+		traces->apply_file_specific_bw(false, cs.fh, cs.count, cs.type);
+    traces->Read_Async_Start(cs.count, cs.type, &mpi_request, cs.offset);
     err = PMPI_File_iread(cs.fh, prefetch_buffer.data(), cs.count, cs.type, &mpi_request);
 
     // TODO error handling

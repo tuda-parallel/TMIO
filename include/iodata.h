@@ -54,9 +54,9 @@ private:
     std:: vector<double>    t_req_e;  // required end time
     std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-    #if BW_LIMIT_GRANULARITY > 1 || PREFETCH
+#if BW_LIMIT_GRANULARITY > 1
     std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io;   // I/O operations for each file
-    #endif
+#endif
     //*******************************
     //* Phase information 
     //*******************************   

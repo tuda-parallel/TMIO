@@ -57,10 +57,6 @@ void IOtraceBase<Tag>::Init(void)
     bw_limit.Init(rank, processes, p_aw, p_ar, p_sw, p_sr);
 #endif
 
-#ifdef PREFETCH
-    prefetcher.init(p_ar, p_sr);
-#endif
-
     if (rank == 0)
     {
         std::string info = "";
