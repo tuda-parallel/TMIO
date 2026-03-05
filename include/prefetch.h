@@ -9,29 +9,80 @@
 #include <iodata.h>
 #include <optional>
 #include <condition_variable>
+#include <iotrace.h>
+
+
+struct CallSignature 
+{
+    enum class CallType{
+        Read,
+        ReadAt,
+    };
+
+    MPI_File fh;
+    int count;
+    MPI_Datatype type;
+    MPI_Offset offset;
+    CallType ct;
+
+    bool operator==(const CallSignature& other) {
+        return fh == other.fh && count == other.count && type == other.type && offset == other.offset;
+    };
+
+    CallSignature(MPI_File fh,
+        int count,
+        MPI_Datatype type,
+        MPI_Offset offset,
+        CallType ct) :
+            fh(fh), count(count), type(type), offset(offset), ct(ct) {};
+};
+
+class RequestCache {
+public:
+    struct Request {
+        MPI_Request request;
+        std::vector<std::byte> buffer;
+        CallSignature cs;
+        double last_access;
+
+        Request(MPI_Request&& request, std::vector<std::byte>&& buffer, CallSignature& cs, double last_access)
+         : request(request), buffer(buffer), cs(cs), last_access(last_access) {};
+    };
+private:
+    std::mutex request_lock;
+    std::map<MPI_File, std::vector<Request>> requests;
+    int total_cached_bytes;
+
+    bool evict_request(int);
+public:
+    const int max_cache_size_bytes = 100'000;
+    const int max_file_size_bytes = 10'000;
+
+    bool take_prefetched_by_call_signature(CallSignature&, MPI_Request*, std::vector<std::byte>&);
+    void insert_request(MPI_File, Request);
+};
 
 class Prefetcher
 {
-public:
     //Everything a call needs
-    struct CallSignature 
-    {
-        MPI_File fh;
-        int count;
-        MPI_Datatype type;
-        MPI_Offset offset;
-
-        bool operator==(const CallSignature& other) {
-            return fh == other.fh && count == other.count && type == other.type && offset == other.offset;
-        };
-    };
 private:
     struct PrefetchInfo
     {
         double last_call_time;
-        CallSignature cs;
-        bool prefetched;
+        std::vector<MPI_Offset> total_offset;
+        std::vector<int> count;
+        MPI_Datatype datatype;
         std::optional<double> next_prefetch_time;
+
+        PrefetchInfo(double last_call_time, 
+            MPI_Offset total_offset, 
+            int count, 
+            MPI_Datatype datatype) : 
+                last_call_time(last_call_time),
+                total_offset{total_offset},
+                count{count},
+                datatype(datatype),
+                next_prefetch_time({}) {};
     };
 
     struct CallDB
@@ -41,20 +92,9 @@ private:
         bool event_ready;
 
         std::mutex call_lock;
-        std::map<MPI_File, PrefetchInfo> prefetch_infos;
+        std::unordered_map<MPI_File, PrefetchInfo> prefetch_infos;
         double io_frequency;
         int prefetch_bandwidth;
-    };
-
-    struct Request {
-        MPI_Request request;
-        std::vector<std::byte> buffer;
-        CallSignature cs;
-    };
-
-    struct RequestsInTransit {
-        std::mutex request_lock;
-        std::vector<Request> requests;
     };
 
     struct AsyncBuffers {
@@ -63,20 +103,24 @@ private:
     };
 
     bool inititalized;
-    const int max_cache_size_bytes = 100'000;
-    const int max_file_size_bytes = 10'000;
+    
     const double prefetch_bandwidth = 10.;
+    std::thread prefetching_thread;
 
     IOtraceMPI* traces;
+    std::shared_ptr<std::atomic<bool>> stop_token;
 
     std::shared_ptr<CallDB> callDBs;
-    std::shared_ptr<RequestsInTransit> requests_in_transit;
+    std::shared_ptr<RequestCache> requests_in_transit;
     std::map<MPI_Request*, AsyncBuffers> async_requests;
     std::map<MPI_Request*, CallSignature> request_signature;
 
 public:
     Prefetcher();
     void init(IOtraceMPI*, int*);
+    void finalize();
+
+    void close_file(MPI_File file);
     int retrieve_read_snyc(CallSignature&, void*, MPI_Status*);
     int retrieve_read_asnyc(CallSignature&, MPI_Request*, void*);
     void register_transaction(CallSignature &cs, double);
@@ -96,8 +140,9 @@ private:
 			va_end(args);
 		}
 	};
-    bool take_prefetched_by_call_signature(CallSignature&, MPI_Request*, std::vector<std::byte>&);
-    static void prefetching_routine(std::shared_ptr<RequestsInTransit>, std::shared_ptr<CallDB>, IOtraceMPI*);
-    static void prefetch_transaction(CallSignature&, std::shared_ptr<RequestsInTransit>&, IOtraceMPI*);
+    static void prefetching_routine(std::shared_ptr<RequestCache>, std::shared_ptr<CallDB>, IOtraceMPI*, std::shared_ptr<std::atomic<bool>>);
+    static void prefetch_transaction(CallSignature&, std::shared_ptr<RequestCache>&, IOtraceMPI*);
     static std::optional<MPI_File> determine_next_prefetch(std::shared_ptr<CallDB>&, double&);
+    static CallSignature determine_prefetch_signature(PrefetchInfo&, MPI_File);
+    static std::optional<double> calculate_next_prefetch(PrefetchInfo&, double, double);
 };

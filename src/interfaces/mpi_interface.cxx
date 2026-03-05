@@ -211,7 +211,8 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if PREFETCH == 1
-	Prefetcher::CallSignature cs = {fh, count, datatype, 0};
+	CallSignature cs = 
+		CallSignature(fh, count, datatype, 0, CallSignature::CallType::Read);
 	return prefetcher.retrieve_read_asnyc(cs, request, buf);
 #else
 	if constexpr (BW_LIMIT_GRANULARITY > 1) 
@@ -229,7 +230,8 @@ int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if PREFETCH == 1
-	Prefetcher::CallSignature cs = {fh, count, datatype, offset};
+	CallSignature cs = 
+		CallSignature(fh, count, datatype, 0, CallSignature::CallType::ReadAt);
 	return prefetcher.retrieve_read_asnyc(cs, request, buf);
 #else
 	if constexpr (BW_LIMIT_GRANULARITY > 1)
@@ -280,7 +282,8 @@ int MPI_File_read(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if PREFETCH == 1
-	Prefetcher::CallSignature cs = {fh, count, datatype, 0};
+	CallSignature cs = 
+		CallSignature(fh, count, datatype, 0, CallSignature::CallType::Read);
 	return prefetcher.retrieve_read_snyc(cs, buf, status);
 #else
 	mpi_iotrace.Read_Sync_Start(count, datatype);
@@ -297,7 +300,8 @@ int MPI_File_read_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_D
 {
 	Function_Debug(__PRETTY_FUNCTION__);
 #if PREFETCH == 1
-	Prefetcher::CallSignature cs = {fh, count, datatype, offset};
+	CallSignature cs = 
+		CallSignature(fh, count, datatype, 0, CallSignature::CallType::ReadAt);
 	return prefetcher.retrieve_read_snyc(cs, buf, status);
 #else 
 	mpi_iotrace.Read_Sync_Start(count, datatype, offset);
