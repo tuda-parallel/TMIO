@@ -7,6 +7,33 @@
 using CallType = CallSignature::CallType;
 using Request = RequestCache::Request;
 
+int Request::fill_buffer_with_request(void* target_buffer, MPI_Offset total_offset, int count) {
+    int err = MPI_SUCCESS;
+    char* buffer_ptr = static_cast<char*>(target_buffer);
+    if (total_offset < cs.offset) {
+        int pre_count = static_cast<int>(total_offset - cs.offset);
+        err = MPI_File_read_at(cs.fh, total_offset, target_buffer, pre_count, cs.type, MPI_STATUS_IGNORE);
+        buffer_ptr = buffer_ptr + pre_count;
+    }
+
+    if (err != MPI_SUCCESS) return err;
+
+    MPI_Offset copy_count = std::min(cs.count, count);
+
+    std::memcpy(buffer_ptr, buffer.data(), copy_count);
+
+    buffer_ptr = buffer_ptr + copy_count;
+
+    MPI_Offset req_end = cs.offset + cs.count;
+    MPI_Offset fet_end = total_offset + count;
+
+    if (req_end < fet_end) {
+        int post_count = static_cast<int>(fet_end - req_end);
+        err = MPI_File_read_at(cs.fh, req_end, buffer_ptr, post_count, cs.type, MPI_STATUS_IGNORE);
+    }
+
+    return err;
+}
 
 /**
  * @brief Find prefetch in cache by call signature
@@ -15,7 +42,7 @@ using Request = RequestCache::Request;
  * @param prefetch_buffer [out] Returns buffer associated with prefetch
  * @return true if prefetch with same call_signature was found
  */
-bool RequestCache::take_prefetched_by_call_signature(CallSignature& cs, MPI_Request* mpi_request, std::vector<std::byte>& prefetch_buffer) {
+std::optional<Request> RequestCache::take_prefetched_by_call_signature(CallSignature& cs, MPI_Offset total_offset) {
 
     //TODO better cs finding
     const std::lock_guard<std::mutex> lock(request_lock);
@@ -24,14 +51,49 @@ bool RequestCache::take_prefetched_by_call_signature(CallSignature& cs, MPI_Requ
     bool found = it != requests.end();
 
     if(found) {
-        //TODO finding request
-        /*prefetch_buffer = it->second.
-        *mpi_request = it->request;
+        MPI_Offset max_overlap = 0;
 
-        requests_in_transit->requests.erase(it);*/
+        MPI_Offset fet_begin = total_offset;
+        MPI_Offset fet_end = total_offset + cs.count;
+
+        std::optional<decltype(it->second.begin())> max_iterator = {};
+
+        for(auto req = it->second.begin(); req < it->second.end(); req++) {
+            if (req->cs.type != cs.type) continue;
+
+            MPI_Offset begin = std::max(req->cs.offset, fet_begin);
+            MPI_Offset end = std::min(req->cs.offset + req->cs.count, fet_end);
+
+            if (end <= begin) continue;
+
+            MPI_Offset overlap = end - begin;
+
+            if (overlap > max_overlap) {
+                max_overlap = overlap;
+            }
+
+            max_iterator = req;
+        }
+        if(max_overlap == 0) return {}; 
+        Request request = std::move(*(max_iterator.value()));
+        it->second.erase(max_iterator.value());
+        return request;
     }
 
-    return found;
+    return {};
+}
+
+/**
+ * @brief Removes requests associated with file
+ */
+void RequestCache::remove_file(MPI_File& fh) {
+    const std::lock_guard<std::mutex> lock(request_lock);
+
+    auto it = requests.find(fh);
+    for(auto& req : it->second) {
+        if(MPI_Wait(&req.request, MPI_STATUS_IGNORE) != MPI_SUCCESS) abort();
+    }
+    requests.erase(fh);
 }
 
 /**
@@ -79,14 +141,10 @@ void RequestCache::insert_request(MPI_File fh, Request request) {
 
     total_cached_bytes += request_size;
 
-    requests[fh].emplace_back(fh, std::move(request));
+    requests[fh].emplace_back(std::move(request));
 }
 
-
-
-Prefetcher::Prefetcher() : inititalized(false) {
-
-}
+Prefetcher::Prefetcher() : inititalized(false) {}
 
 /**
  * @brief Initializes prefetching and spawns asnyc prefetch thread
@@ -135,20 +193,28 @@ int Prefetcher::retrieve_read_asnyc(CallSignature& cs, MPI_Request* mpi_request,
     std::vector<std::byte> prefetch_buffer;
 
     int err;
-    if (requests_in_transit->take_prefetched_by_call_signature(cs, mpi_request, prefetch_buffer)) {
-        AsyncBuffers buffers = {std::move(prefetch_buffer), target_buffer};
 
-        async_requests.emplace(mpi_request, buffers);
+    MPI_Offset total_offset;
+    if (cs.ct == CallType::Read) {
+        MPI_File_get_position(cs.fh, &total_offset);
+    } else {
+        total_offset = cs.offset;
+    }
+
+
+    if (std::optional<Request> request = requests_in_transit->take_prefetched_by_call_signature(cs, total_offset); request.has_value()) {
+
+        async_requests.emplace(mpi_request, std::move(AsyncBuffers(std::move(request.value()), target_buffer, cs.count, total_offset)));
 
         err = MPI_SUCCESS;
     } else {
         Prefetcher::Log<VerbosityLevel::DETAILED_LOG>(
             "Prefetch miss. Fetching read manually");
-        traces->Read_Async_Start(cs.count, cs.type, mpi_request, cs.offset);
+        traces->Read_Async_Start(cs.count, cs.type, mpi_request, cs.fh, cs.offset);
         err = PMPI_File_iread_at(cs.fh, cs.offset, target_buffer, cs.count, cs.type, mpi_request);
     }
 
-    request_signature[mpi_request] = cs;
+    request_signature.insert_or_assign(mpi_request, cs);
     return err;
 }
 
@@ -161,11 +227,10 @@ int Prefetcher::retrieve_read_asnyc(CallSignature& cs, MPI_Request* mpi_request,
 void Prefetcher::fetch_read_async_wait(MPI_Request* request, int err) {
     if (err != MPI_SUCCESS) return;
 
-    auto it = std::find(async_requests.begin(), async_requests.end(), request);
+    auto it = async_requests.find(request);
 
     if(it != async_requests.end()) {
-        std::memcpy(it->second.target_buffer,
-            it->second.prefetch_buffer.data(), it->second.prefetch_buffer.size());
+        it->second.prefetch_request.fill_buffer_with_request(it->second.target_buffer, it->second.total_offset, it->second.count);
 
         async_requests.erase(it);
     }
@@ -189,11 +254,10 @@ void Prefetcher::fetch_read_async_wait(MPI_Request* request, int err) {
 void Prefetcher::fetch_read_async_test(MPI_Request* request, int* flag, int err) {  
     if(!*flag || err != MPI_SUCCESS) return;
 
-    auto it = std::find(async_requests.begin(), async_requests.end(), request);
+    auto it = async_requests.find(request);
 
     if (it != async_requests.end()) {
-        std::memcpy(it->second.target_buffer,
-            it->second.prefetch_buffer.data(), it->second.prefetch_buffer.size());
+        it->second.prefetch_request.fill_buffer_with_request(it->second.target_buffer, it->second.total_offset, it->second.count);
 
         async_requests.erase(it);
     }
@@ -215,6 +279,7 @@ void Prefetcher::close_file(MPI_File file) {
     if(it != callDBs->prefetch_infos.end()) {
         callDBs->prefetch_infos.erase(it);
     }
+    
 }
 
 /**
@@ -226,16 +291,20 @@ void Prefetcher::close_file(MPI_File file) {
  */
 int Prefetcher::retrieve_read_snyc(CallSignature& cs, void* target_buffer, MPI_Status* status)
 {
-    MPI_Request mpi_request;
-    std::vector<std::byte> prefetch_buffer;
-
     double time_req = MPI_Wtime();
 
+    MPI_Offset total_offset;
+    if (cs.ct == CallType::Read) {
+        MPI_File_get_position(cs.fh, &total_offset);
+    } else {
+        total_offset = cs.offset;
+    }
+
     int err;
-    if (requests_in_transit->take_prefetched_by_call_signature(cs, &mpi_request, prefetch_buffer)) {
-        err = MPI_Wait(&mpi_request, status);
+    if (std::optional<Request> request = requests_in_transit->take_prefetched_by_call_signature(cs, total_offset); request.has_value()) {
+        err = MPI_Wait(&request.value().request, status);
         if(err == MPI_SUCCESS) {
-            std::memcpy(target_buffer, prefetch_buffer.data(), prefetch_buffer.size());
+            request.value().fill_buffer_with_request(target_buffer, total_offset, cs.count);
         }
         
     } else {
@@ -352,9 +421,10 @@ void Prefetcher::prefetch_transaction(CallSignature& cs, std::shared_ptr<Request
 
 
     // Start actual prefatch call
-    if constexpr (BW_LIMIT_GRANULARITY > 1)
+#if BW_LIMIT_GRANULARITY > 1
 		traces->apply_file_specific_bw(false, cs.fh, cs.count, cs.type);
-    traces->Read_Async_Start(cs.count, cs.type, &mpi_request, cs.offset);
+#endif
+    traces->Read_Async_Start(cs.count, cs.type, &mpi_request, cs.fh, cs.offset);
     err = PMPI_File_iread(cs.fh, prefetch_buffer.data(), cs.count, cs.type, &mpi_request);
 
     if(err != MPI_SUCCESS || type_size <= 0) return;

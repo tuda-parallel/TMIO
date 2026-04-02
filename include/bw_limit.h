@@ -12,14 +12,16 @@ using TransactionType = IOdata::TransactionType;
 template<typename FDType, typename RequestIDType>
 class [[maybe_unused]] FileTracker {
 
-	//TODO: make this threadsafe
+	
 private:
 	std::map<FDType, std::filesystem::path> file_register;
 	std::map<RequestIDType, std::filesystem::path> request_register;
+	std::mutex tracker_lock;
 
 public:
 	void track_file_opened(const char* path, const FDType fd)
 	{
+		std::lock_guard lock(tracker_lock);
 		// Get full unique path
 		auto full_path = std::filesystem::absolute(
 			std::filesystem::weakly_canonical(std::filesystem::path(path)));
@@ -28,26 +30,30 @@ public:
 
 	void track_file_closed(const FDType fd) 
 	{
+		std::lock_guard lock(tracker_lock);
 		file_register.erase(fd);
 	};
 
-	std::filesystem::path* get_fd_path(const FDType fd) 
+	std::optional<std::filesystem::path> get_fd_path(const FDType fd) 
 	{
+		std::lock_guard lock(tracker_lock);
 		auto it = file_register.find(fd);
 		if (it != file_register.end()) {
-			return &it->second;
+			return it->second;
 		}
-		return nullptr;
+		return {};
 	};
 
 	bool fd_valid(const FDType fd)
 	{
+		std::lock_guard lock(tracker_lock);
 		auto it = file_register.find(fd);
 		return it != file_register.end();
 	}
 
 	void register_request(const RequestIDType request_id, const FDType fd) 
 	{
+		std::lock_guard lock(tracker_lock);
 		auto it = file_register.find(fd);
 		if (it != file_register.end()) {
 			auto path = it->second;
@@ -55,17 +61,19 @@ public:
 		}
 	};
 
-	std::filesystem::path* get_request_path(const RequestIDType request_id) 
+	std::optional<std::filesystem::path> get_request_path(const RequestIDType request_id) 
 	{
+		std::lock_guard lock(tracker_lock);
 		auto it = request_register.find(request_id);
 		if(it != request_register.end()) {
-			return &it->second;
+			return it->second;
 		}
-		return nullptr;
+		return {};
 	};
 
 	void unregister_request(const RequestIDType request_id) 
 	{
+		std::lock_guard lock(tracker_lock);
 		auto it = request_register.find(request_id);
 		if(it != request_register.end()) {
 			request_register.erase(it);		
@@ -111,7 +119,7 @@ private:
 	
 #endif // BW_LIMIT
 
-	double get_phase_info(TransactionType, std::string info) const;
+	std::optional<double> get_last_phase_info(TransactionType, std::string info) const;
 	void set_phase_info(TransactionType, std::string info, double value);
 
 	template <VerbosityLevel Level>
@@ -150,11 +158,13 @@ public:
 #endif
 
 #if BW_LIMIT_GRANULARITY > 1
-	void limit_by_file(bool, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size);
+	void limit_by_file(bool, [[maybe_unused]] const std::optional<std::filesystem::path> path, [[maybe_unused]] long long transaction_size);
 #endif
 
+	void limit_checkpoint(long long transaction_size, double end_time);
+
 #if BW_LIMIT_FTIO == 1
-	void receive_dominant_frequency(int, MPI_Comm);
+	void set_io_frequency(double);
 #endif
 
 };

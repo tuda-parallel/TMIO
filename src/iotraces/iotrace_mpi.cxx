@@ -11,7 +11,7 @@
  * @param request  [in] write request
  * @param offset   [in,optional] offset of the I/O operation
  */
-void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
+void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_File fd, MPI_Offset offset)
 {
     double start_time = MPI_Wtime() - t_0;
     int data_size_write;
@@ -25,7 +25,7 @@ void IOtraceMPI::Write_Async_Start(int count, MPI_Datatype datatype, MPI_Request
             "%s > rank %i > #%li will asnyc write %i x %i = %lli bytes \n",
                     caller, rank, counter++, count, data_size_write, total_size); });
 
-    Write_Async_Start_Impl(request, total_size, offset, start_time);
+    Write_Async_Start_Impl(request, total_size, offset, start_time, fd);
 }
 
 //************************************************************************************
@@ -65,7 +65,7 @@ void IOtraceMPI::Write_Async_Required(MPI_Request *request)
  * @param request  [in] write request
  * @param offset   [in,optional] offset of the I/O operation
  */
-void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_Offset offset)
+void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request *request, MPI_File fd, MPI_Offset offset)
 {
     int data_size_read;
 
@@ -80,7 +80,7 @@ void IOtraceMPI::Read_Async_Start(int count, MPI_Datatype datatype, MPI_Request 
             "%s > rank %i > #%li will asnyc read %i x %i = %lli bytes \n",
                     caller, rank, counter++, count, data_size_read, total_size); });
 
-    Read_Async_Start_Impl(request, total_size, offset, start_time);
+    Read_Async_Start_Impl(request, total_size, offset, start_time, fd);
 }
 
 //************************************************************************************
@@ -194,3 +194,10 @@ void IOtraceMPI::apply_file_specific_bw(bool write, MPI_File fd, int count, MPI_
     apply_file_specific_bw_impl(write, fd, transaction_bytes);
 }
 #endif
+
+void IOtraceMPI::apply_checkpoint_limit(int count, MPI_Datatype datatype, std::chrono::steady_clock::time_point finish_time) {
+    int data_size_write;
+    MPI_Type_size(datatype, &data_size_write);
+    long long transaction_bytes = static_cast<long long>(count) * data_size_write;
+    apply_checkpoint_limit_impl(transaction_bytes, finish_time);
+}

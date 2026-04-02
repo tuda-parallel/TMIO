@@ -14,6 +14,7 @@
 #include <vector>
 #include <cassert>
 #include <unordered_set>
+#include <optional>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
@@ -107,9 +108,12 @@ public:
 	//*************************************
 	void Set(std::string, bool);
 
+	void retrieve_FTIO_frequency(int, MPI_Comm);
+
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw_impl(bool, FDType, long long);
 #endif
+	void apply_checkpoint_limit_impl(long long, std::chrono::steady_clock::time_point);
 #if BW_LIMIT_GRANULARITY == 1
 	void apply_bw_limit(void);
 #endif
@@ -123,18 +127,16 @@ protected:
 	bool open;		 	 // flag indicating file status
 
 	// FIXME: Use function local varaibel to replace the thread_local ones
-	thread_local double t_sync_write_start = std::numeric_limits<double>::quiet_NaN();	// time stamp for start of sync write operation
-	thread_local double t_sync_read_start = std::numeric_limits<double>::quiet_NaN();	// time stamp for start of sync read operation
-	thread_local double t_sync_read_end = std::numeric_limits<double>::quiet_NaN();
-	thread_local double t_sync_write_end = std::numeric_limits<double>::quiet_NaN();
+	inline static thread_local long long t_sync_read_start;
+	inline static thread_local long long t_sync_write_start;
 
 	// FIXME: Use function local varaibel to replace the thread_local ones
-	thread_local long long size_sync_write = 0;	// size of sync write operation in KB
-	thread_local long long size_sync_read = 0;	// size of async read operation in KB
+	inline static thread_local long long size_sync_write;	// size of sync write operation in KB
+	inline static thread_local long long size_sync_read;	// size of async read operation in KB
 
 	double t_0;						// start time of app (for each rank)
 	std::atomic<double> delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
-	thread_local double t_overhead = 0;			// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
+	inline static thread_local double t_overhead;	// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
 	std::atomic<double> delta_t_io_overhead = 0; // elapsed in-period overhead during io tracing since last IOtrace::Summary calling (for each rank)
 	double t_summary = 0;			// elapsed time (for each rank) FIXME: Looks should be the MPI_Wtime when last time IOtrace::Summary is finishing its called
 
@@ -177,7 +179,7 @@ protected:
 	//*************************************
 	//* Write tracing
 	//*************************************
-    void Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd = std::nullopt);
     void Write_Async_End_Impl(RequestIDType request, int write_status);
     void Write_Async_Required_Impl(RequestIDType request);
     void Write_Sync_Start_Impl(long long size, long long offset, double start_time);
@@ -186,7 +188,7 @@ protected:
 	//*************************************
 	//* Read tracing
 	//*************************************
-    void Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd = std::nullopt);
     void Read_Async_End_Impl(RequestIDType request, int read_status);
     void Read_Async_Required_Impl(RequestIDType request);
     void Read_Sync_Start_Impl(long long size, long long offset, double start_time);
@@ -287,20 +289,20 @@ public:
 	//*************************************
 	//* MPI Write tracing
 	//*************************************
-	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_Offset offset = 0);
+	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset = 0);
 	void Write_Async_End(MPI_Request *, int write_status = 1);
 	void Write_Async_Required(MPI_Request *);
 	void Write_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
-	void Write_Sync_End(void);
+	void Write_Sync_End();
 
 	//*************************************
 	//* MPI Read tracing
 	//*************************************
-	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_Offset offset = 0);
+	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset = 0);
 	void Read_Async_End(MPI_Request *request, int read_status = 1);
 	void Read_Async_Required(MPI_Request *);
 	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
-	void Read_Sync_End(void);
+	void Read_Sync_End();
 
 	//*************************************
 	//* MPI limit bandwidth
@@ -308,9 +310,7 @@ public:
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw(bool, MPI_File, int, MPI_Datatype);
 #endif
-#if BW_LIMIT_GRANULARITY == 1
-	void apply_bw_limit(void);
-#endif
+	void apply_checkpoint_limit(int count, MPI_Datatype datatype, std::chrono::steady_clock::time_point finish_time);
 #ifdef CUSTOM_MPI
 	void set_custom_throughput(void);
 #endif
@@ -339,7 +339,7 @@ public:
 	void Write_Async_Required(const struct aiocb64 *aiocbp);
 	void Write_Sync_Start(size_t count, off64_t offset = 0);
 	void Batch_Write_Sync_Start(size_t count, off64_t offset = 0);
-	void Write_Sync_End(void);
+	void Write_Sync_End();
 	void Batch_Write_Sync_End();
 
 	//*************************************
@@ -353,7 +353,7 @@ public:
 	void Read_Async_Required(const struct aiocb64 *aiocbp);
 	void Read_Sync_Start(size_t count, off64_t offset = 0);
 	void Batch_Read_Sync_Start(size_t count, off64_t offset = 0);
-	void Read_Sync_End(void);
+	void Read_Sync_End();
 	void Batch_Read_Sync_End();
 };
 

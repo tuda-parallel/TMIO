@@ -47,6 +47,8 @@ public:
 
         Request(MPI_Request&& request, std::vector<std::byte>&& buffer, CallSignature& cs, double last_access)
          : request(request), buffer(buffer), cs(cs), last_access(last_access) {};
+
+        int fill_buffer_with_request(void* target_buffer, MPI_Offset total_offset, int count);
     };
 private:
     std::mutex request_lock;
@@ -58,7 +60,8 @@ public:
     const int max_cache_size_bytes = 100'000;
     const int max_file_size_bytes = 10'000;
 
-    bool take_prefetched_by_call_signature(CallSignature&, MPI_Request*, std::vector<std::byte>&);
+    void remove_file(MPI_File&);
+    std::optional<Request> take_prefetched_by_call_signature(CallSignature&, MPI_Offset);
     void insert_request(MPI_File, Request);
 };
 
@@ -98,8 +101,12 @@ private:
     };
 
     struct AsyncBuffers {
-        std::vector<std::byte> prefetch_buffer;
+        RequestCache::Request prefetch_request;
         void* target_buffer;
+        MPI_Offset total_offset;
+        int count;
+
+        AsyncBuffers(RequestCache::Request&& pr, void* tb, int c, MPI_Offset to) : prefetch_request(pr), target_buffer(tb), total_offset(to), count(c) {};
     };
 
     bool inititalized;

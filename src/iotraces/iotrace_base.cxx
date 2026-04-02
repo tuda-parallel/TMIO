@@ -99,10 +99,10 @@ void IOtraceBase<Tag>::Summary(void)
 #endif
 
     // close phases if flie close was skipped
-    if (p_sw->phase || p_sr->phase)
+    if (p_sw->phase_active() || p_sr->phase_active())
     {
-        p_sw->Phase_End_Sync(t_sync_write_end);
-        p_sr->Phase_End_Sync(t_sync_read_end);
+        p_sw->close_sync_phase();
+        p_sr->close_sync_phase();
         if (rank == 0)
             printf("%sWarning: File was not closed. Close file to obtained accurate information for sync I/O operations%s\n ", RED, BLACK);
     }
@@ -199,8 +199,8 @@ void IOtraceBase<Tag>::Summary(void)
 
     // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,MPI_Wtime() - t_0);
 
-#if BW_LIMIT_FTIO == 1
-    bw_limit.receive_dominant_frequency(rank, IO_WORLD);
+#if BW_LIMIT_FTIO == 1 || PREFETCH == 1
+    retrieve_FTIO_frequency(rank, IO_WORLD);
 #endif
 
     //? Overhead calculation
@@ -281,11 +281,15 @@ void IOtraceBase<Tag>::Summary(void)
 //************************************************************************************
 
 template <typename Tag>
-void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time)
+void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, [[maybe_unused]] std::optional<FDType> fd)
 {
     Overhead_Start(start_time);
+#if BW_LIMIT_GRANULARITY > 1
+    if(fd)
+        file_tracker.register_request(requestID, *fd);
+#endif
     {
-        std::lock_guard<std::mutex> lock(async_write_vecs_lock);
+        std::lock_guard lock(async_write_vecs_lock);
         // get write timestamp
         async_write_time.push_back(start_time);
 
@@ -326,7 +330,9 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         //  first time the status of the actual write is quarried. Solves the problem of several MPI_Test
         if (double t_async_write_start; Check_Request_Write(request, &t_async_write_start, &size_async_write, 2))
         {
-
+        #if BW_LIMIT_GRANULARITY > 1
+            file_tracker.unregister_request(request);
+        #endif
             // add values to traced data and add phase values if condition is true:
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
             // p_aw->Phase_End_Act(size_async_write, t_async_write_start, MPI_Wtime() - t_0,(async_write_request.empty() || (async_write_queue_act.size() == 1 && async_write_queue_act.back() == 0)));
@@ -360,11 +366,11 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     long long size_async_write;
     if (double t_async_write_start; Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
-        std::filesystem::path* path = nullptr;
+        std::optional<std::filesystem::path> path;
 #if BW_LIMIT_GRANULARITY > 1
         path = file_tracker.get_request_path(request);
 #endif
-        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, path);
+        p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, std::move(path));
 
         IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
                                                                       {
@@ -381,12 +387,15 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
 //*                               1. Read_Async_Start
 //************************************************************************************
 template <typename Tag>
-void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time)
+void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd)
 {
     Overhead_Start(start_time);
-
+    #if BW_LIMIT_GRANULARITY > 1
+    if(fd)
+        file_tracker.register_request(requestID, *fd);
+    #endif
     { // scope for async read vecs lock
-        std::lock_guard<std::mutex> lock(async_read_vecs_lock);
+        std::lock_guard lock(async_read_vecs_lock);
 
         // get read timestamp
         async_read_time.push_back(start_time);
@@ -459,15 +468,15 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     long long size_async_read;
     if (double t_async_read_start; Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
-        std::filesystem::path* path = nullptr;
+        std::optional<std::filesystem::path> path;
 #if BW_LIMIT_GRANULARITY > 1
         path = file_tracker.get_request_path(request);
 #endif
-        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, path);
+        p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, std::move(path));
 
         IOtraceBase<Tag>::LogWithAction<VerbosityLevel::DETAILED_LOG>([&]()
                                                                       {
-            std::lock_guard<std::mutex> lock(async_read_vecs_lock);                                                            
+            std::lock_guard lock(async_read_vecs_lock);                                                            
             IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
                 "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);});
     }
@@ -488,9 +497,9 @@ void IOtraceBase<Tag>::Write_Sync_Start_Impl(long long size, long long offset, d
     size_sync_write = size;
 
 #if SYNC_MODE == 1
-    p_sw->Phase_Start(p_sw->flag && !(p_sw->phase), t_sync_write_start, size_sync_write, offset);
+    p_sw->Phase_Start(p_sw->flag && !(p_sw->phase), t_sync_write_start, size, offset);
 #else
-    p_sw->Phase_Start(true, t_sync_write_start, size_sync_write, offset);
+    p_sw->Phase_Start(true, t_sync_write_start, size, offset);
 #endif
 
     IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
@@ -507,9 +516,9 @@ void IOtraceBase<Tag>::Write_Sync_Start_Impl(long long size, long long offset, d
 template <typename Tag>
 void IOtraceBase<Tag>::Write_Sync_End_Impl(void)
 {
-    t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
+    double t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
-    p_sw->Add_IO_Act(size_sync_write, t_sync_write_start, t_sync_write_end);
+    p_sw->Add_IO_Act(size_sync_write, t_sync_write_end, t_sync_write_end);
 
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
@@ -534,16 +543,16 @@ void IOtraceBase<Tag>::Read_Sync_Start_Impl(long long size, long long offset, do
     size_sync_read = size;
 
 #if SYNC_MODE == 1
-    p_sr->Phase_Start(p_sr->flag && !(p_sr->phase), t_sync_read_start, size_sync_read, offset);
+    p_sr->Phase_Start(p_sr->flag && !(p_sr->phase), start_time, size_sync_read, offset);
 #else
-    p_sr->Phase_Start(true, t_sync_read_start, size_sync_read, offset);
+    p_sr->Phase_Start(true, start_time, size_sync_read, offset);
 #endif
 
     IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i > will read %lli bytes \n", caller, rank, size);
     IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
         "%s > rank %i %s>> started sync read @ %.2f s %s\n", caller, rank,
-        GREEN, t_sync_read_start, BLACK);
+        GREEN, start_time, BLACK);
     IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
@@ -557,7 +566,7 @@ void IOtraceBase<Tag>::Read_Sync_Start_Impl(long long size, long long offset, do
 template <typename Tag>
 void IOtraceBase<Tag>::Read_Sync_End_Impl(void)
 {
-    t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
+    double t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
 
     p_sr->Add_IO_Act(size_sync_read, t_sync_read_start, t_sync_read_end);
 
@@ -613,8 +622,8 @@ void IOtraceBase<Tag>::Close(const FDType fd)
 #endif
 
 #if SYNC_MODE == 1
-        p_sw->Phase_End_Sync(t_sync_write_end);
-        p_sr->Phase_End_Sync(t_sync_read_end);
+        p_sw->close_sync_phase();
+        p_sr->close_sync_phase();
 #endif
 #if IOTRACE_VERBOSE >= 2
         printf("%s > rank %i %s>> closed the file %s\n", caller, rank, GREEN, BLACK);
@@ -643,7 +652,7 @@ template <typename Tag>
 bool IOtraceBase<Tag>::
     Check_Request_Write(RequestIDType request, double *start_time, long long *size, int mode)
 {
-    std::lock_guard<std::mutex> lock(async_write_vecs_lock);
+    std::lock_guard lock(async_write_vecs_lock);
     if (!async_write_request.empty())
     {
         for (unsigned int i = 0; i < async_write_request.size(); i++)
@@ -702,7 +711,7 @@ bool IOtraceBase<Tag>::
 template <typename Tag>
 bool IOtraceBase<Tag>::Check_Request_Read(RequestIDType request, double *start_time, long long *size, int mode)
 {
-    std::lock_guard<std::mutex> lock(async_read_vecs_lock);
+    std::lock_guard lock(async_read_vecs_lock);
 
     if (!async_read_request.empty())
     {
@@ -929,12 +938,23 @@ template <typename Tag>
 void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long long transact_size)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    std::filesystem::path* path = nullptr;
-    path = file_tracker.get_fd_path(fd);
-    bw_limit.limit_by_file(write, path, transact_size);
+    auto path = file_tracker.get_fd_path(fd);
+    bw_limit.limit_by_file(write, std::move(path), transact_size);
     Overhead_End();
 }
 #endif
+
+template <typename Tag>
+void IOtraceBase<Tag>::apply_checkpoint_limit_impl(long long transaction_size, std::chrono::steady_clock::time_point finish_time)
+{
+    Overhead_Start(MPI_Wtime() - t_0);
+    std::chrono::duration checkpoint_duration = finish_time - std::chrono::steady_clock::now();
+    auto checkpoint_sec = std::chrono::duration<double>(checkpoint_duration).count();
+#ifdef BW_LIMIT
+    bw_limit.limit_checkpoint(transaction_size, checkpoint_sec);
+#endif
+    Overhead_End();
+}
 
 //! ---------------------- Bw limit with Custom MPI implementaiton -------------------
 //************************************************************************************
@@ -962,6 +982,34 @@ void IOtraceBase<Tag>::set_custom_throughput(void){
     bw_limit.set_throughput();
     Overhead_End();
 }
+#endif
+
+#if BW_LIMIT_FTIO == 1
+template <typename Tag>
+void IOtraceBase<Tag>::retrieve_FTIO_frequency(int rank, MPI_Comm IO_WORLD) {
+    double dominant_frequency = -1.0;
+
+	if (rank == 0) {
+		zmq::context_t context(1);
+		zmq::socket_t receiver(context, ZMQ_PULL);
+		receiver.connect("tcp://127.0.0.1:5556");
+		
+		zmq::message_t msg;
+		auto res = receiver.recv(msg, zmq::recv_flags::dontwait);
+
+		if (res.has_value() && res.value() == 0 && !msg.empty()) {
+			std::memcpy(&dominant_frequency, msg.data(), sizeof(double));
+		}
+	}
+
+	int root = 0;
+
+	MPI_Bcast(&dominant_frequency, 1, MPI_DOUBLE, 0, IO_WORLD);
+
+    bw_limit.set_io_frequency();
+
+}
+
 #endif
 
 // Explicit instantiation for MPI_Tag

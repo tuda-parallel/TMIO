@@ -16,7 +16,7 @@
 #endif
 
 #ifndef ENABLE_IOURING_TRACE
-#define ENABLE_IOURING_TRACE 1 // set to 1 to enable tracing
+#define ENABLE_IOURING_TRACE 0 // set to 1 to enable tracing
 // 0: disable tracing
 // 1: enable tracing
 #endif
@@ -32,7 +32,7 @@ enum class VerbosityLevel {
 };
 
 #ifndef DEBUG 
-#define DEBUG 1 // set debug level for tmio.cxx
+#define DEBUG 0 // set debug level for tmio.cxx
 #endif
 
 #ifndef IODATA_VERBOSE
@@ -40,7 +40,7 @@ enum class VerbosityLevel {
 #endif
 
 #ifndef IOTRACE_VERBOSE
-#define IOTRACE_VERBOSE 1 //set debug level for iodata.cxx
+#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
 
@@ -57,7 +57,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef BW_LIMIT_VERBOSE
-#define BW_LIMIT_VERBOSE 1 //controls debug of bw_limit in  bw_limit.cxx
+#define BW_LIMIT_VERBOSE 4 //controls debug of bw_limit in  bw_limit.cxx
 constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 #endif
 
@@ -217,7 +217,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 // Defines the Limiting strategy
 #ifndef BW_LIMIT_STRATEGY
-#define BW_LIMIT_STRATEGY 2 // 0: always (default) -- 1: increase only -- 2: limit the down side 
+#define BW_LIMIT_STRATEGY 1 // 0: always (default) -- 1: increase only -- 2: limit the down side 
 #endif
 // Tolerance value to scale the desired values
 #ifndef TOL
@@ -232,19 +232,15 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 // 3 By file - scaled by transaction size
 #endif
 
-// Limit bandwidth based on file size difference
-#ifndef BW_FILE_SCALING
-#define BW_FILE_SCALING 1
-#endif
 // Use FTIO for phase length calculation
 #if FILE_FORMAT == 3 // ZMQ
-#define BW_LIMIT_FTIO 1
+#define BW_LIMIT_FTIO 0
 #endif
 #endif
 
 
 #ifndef PREFETCH
-#define PREFETCH 1 // If set to 1, prefetch MPI calls
+#define PREFETCH 0 // If set to 1, prefetch MPI calls
 #endif
 
 

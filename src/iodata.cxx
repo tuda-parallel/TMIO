@@ -33,7 +33,7 @@ void IOdata::Mode(int rank, TransactionType tt)
  * @note    Should only be called with data_lock engaged
  * @details Adds IO operation to tracked data
  */
-void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
+void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<std::filesystem::path> path)
 {
 #if BW_LIMIT_GRANULARITY > 1
     if (path) {
@@ -192,7 +192,7 @@ void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
  * @details \e Phase_Start_Req sets the flag \e phase to active during the first call. During the first call to this function 
  * the flag becomes false and the required phase ends. 
  */
-void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] const std::filesystem::path* path)
+void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<std::filesystem::path> path)
 {
 
     std::lock_guard lock(phase_data_lock);
@@ -211,7 +211,7 @@ void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] c
 #endif
     }
     // add required values to tracked data
-    Add_IO_Req(b, ts, te, path);
+    Add_IO_Req(b, ts, te, std::move(path));
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
@@ -283,9 +283,8 @@ void IOdata::Phase_End_Act(long long b, double ts, double te, bool phase_conditi
  * @brief end of sync phase. Calculates throughput if ONLINE flag is passed (see \e ioflags.h)
  * 
  */
-void IOdata::Phase_End_Sync(double t)
+void IOdata::Phase_End_Sync_Impl(double t)
 {
-    std::lock_guard lock(phase_data_lock);
     // add phase info
     if (phase)
     {
@@ -304,6 +303,11 @@ void IOdata::Phase_End_Sync(double t)
         printf("%s > rank %i %s> %s phase %li > sync phase over >> %.3f KB handled in %.5f sec --> T_avr(%li) = %.3f KB/s %s\n", caller, rank, CYAN, transaction_identifier, phase_data.size(), (double)phase_data.back().data/1000, phase_data.back().t_end_act - phase_data.back().t_start, phase_data.size(), phase_data.back().T_avr / 1'000'000, BLACK);
 #endif
     }
+}
+
+void IOdata::Phase_End_Sync(double t) {
+    std::lock_guard lock(phase_data_lock);
+    Phase_End_Sync_Impl(t);
 }
 
 
@@ -361,9 +365,23 @@ bool IOdata::is_write() {
             transaction_type == IOdata::TransactionType::Async_Write;
 }
 
-double IOdata::get_last_phase_info(std::string info) {
+std::optional<double> IOdata::get_last_phase_info(std::string info) {
     std::shared_lock lock(phase_data_lock);
-    phase_data.empty()? -1 : phase_data.back().get(info);
+    if(phase_data.empty())
+        return {};
+    return phase_data.back().get(info);
+}
+
+std::optional<double> IOdata::get_last_phase_duration() {
+    std::shared_lock lock(phase_data_lock);
+    if(phase) {
+        if(phase_data.size() < 2) return {};
+        size_t second_to_last = phase_data.size() -2;
+        return phase_data[second_to_last].t_end_req - phase_data[second_to_last].t_start;
+    } else {
+        if(phase_data.empty()) return {};
+        return phase_data.back().t_end_req - phase_data.back().t_start;
+    }
 }
 
 void IOdata::set_last_phase_info(std::string info, double value) {
@@ -375,6 +393,14 @@ void IOdata::set_last_phase_info(std::string info, double value) {
 size_t IOdata::get_phase_count() {
     std::shared_lock lock(phase_data_lock);
     return phase_data.size();
+}
+
+void IOdata::close_sync_phase() {
+    std::lock_guard lock(phase_data_lock);
+    if (t_act_e.empty()) return;
+    double last_t_act_e = t_act_e.back();
+    
+    Phase_End_Sync_Impl(last_t_act_e);
 }
 
 std::vector<double> IOdata::get_bandwidth_act() {
@@ -408,7 +434,7 @@ std::vector<double> IOdata::get_t_req_e() {
 
 void IOdata::gather_phase_data(MPI_Datatype GATHER_collect, collect* all_data, int* num_ops, int* displacement, MPI_Comm IO_WORLD) {
     std::shared_lock lock(phase_data_lock);
-    MPI_Gatherv(&phase_data[0], phase_data.size(), GATHER_collect, all_data, num_ops, displacement, GATHER_collect, 0, IO_WORLD);
+    MPI_Gatherv(phase_data.data(), phase_data.size(), GATHER_collect, all_data, num_ops, displacement, GATHER_collect, 0, IO_WORLD);
 }
 
 void IOdata::clear_phase_data() {
@@ -514,7 +540,7 @@ void IOdata::Bandwidth_In_Phase_Offline(void)
     }
 
     if (phases.size() > 0){
-        for (int i = 0; i <= phases.back(); i++)
+        for (int i = 0; i <= phase_data.size(); i++)
         {
             
             phase_data[i].T_avr = phase_data[i].data / (phase_data[i].t_end_act - phase_data[i].t_start);
@@ -525,6 +551,11 @@ void IOdata::Bandwidth_In_Phase_Offline(void)
         }
     }
 
+}
+
+bool IOdata::phase_active() {
+    std::shared_lock lock(phase_data_lock);
+    return phase;
 }
 
 void IOdata::Debug_Info_Bandwidth_In_Phase(void)
@@ -543,19 +574,21 @@ void IOdata::Debug_Info_Bandwidth_In_Phase(void)
 }
 
 const char* IOdata::type_string(IOdata::TransactionType tt) {
+    const char* res;
     switch (tt)
     {
     case TransactionType::Async_Read:
-        return "async read";
+        res =  "async read";
         break;
     case TransactionType::Async_Write:
-        return "async write";
+        res = "async write";
         break;
     case TransactionType::Sync_Read:
-        return "sync read";
+        res = "sync read";
         break;
     case TransactionType::Sync_Write:
-        return "sync write";
+        res = "sync write";
         break;
-    }
+    };
+    return res;
 }

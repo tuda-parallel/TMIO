@@ -1,5 +1,7 @@
 #include "bw_limit.h"
 
+#include <algorithm>
+
 #if BW_LIMIT_FTIO == 1 
 #include <zmq.hpp>
 #endif
@@ -87,18 +89,19 @@ void Bw_limit::Reset(void)
 }
 
 //************************************************************************************
-//*                               1. get_phase_info
+//*                               1. get_last_phase_info
 //************************************************************************************
 /**
  * @brief returns the I/O traces to extern libaries.
  *
  * @param mode either "aw", "sw", "ar" or "sr"
  * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
+ * @param finished true if data from finished phase is requested
  * @return double
  */
-double Bw_limit::get_phase_info(TransactionType mode, std::string info) const
+std::optional<double> Bw_limit::get_last_phase_info(TransactionType mode, std::string info) const
 {
-	double res;
+	std::optional<double> res;
 	switch (mode)
 	{
 		case TransactionType::Async_Write:
@@ -204,20 +207,18 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 
 #if BW_LIMIT_GRANULARITY > 1
 
-void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem::path* path, [[maybe_unused]] long long transaction_size)
+void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<std::filesystem::path> path, [[maybe_unused]] long long transaction_size)
 {
 	std::lock_guard lock(bw_lock);
 
-	if (size_t phase_count = p_aw->get_phase_count(); phase_count > counter_iwrite) {
+	if (!p_aw->phase_active()) { // TODO check phase done
 		set_throughput_impl(TransactionType::Async_Write);
 		bw_limit_iwrite = 0.0;
-		counter_iwrite = phase_count;
 	}
 	
-	if (size_t phase_count = p_ar->get_phase_count(); phase_count > counter_iread) {
+	if (!p_ar->phase_active()) {
 		set_throughput_impl(TransactionType::Async_Read);
-		bw_limit_iwrite = 0.0;
-		counter_iread = phase_count;
+		bw_limit_iread = 0.0;
 	}
 
 	double file_measured_bw = 0.0;
@@ -226,18 +227,23 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 	IOdata* p_data = write? p_aw : p_ar;
 
 	
-	if(path)
+	if(path) {
 		file_measured_bw = p_data->get_prev_file_bw(*path);
+	}
 
 	if (file_measured_bw <= 0.0) {
-		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth, falling back to phase BW");
-		double phase_duration = Bw_limit::get_phase_info(transaction, "t_start") - Bw_limit::get_phase_info(transaction, "t_end_req");
-		file_measured_bw = transaction_size / phase_duration;
+		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth, falling back to phase BW\n");
+		auto phase_duration = p_data->get_last_phase_duration();
+		if(!phase_duration.has_value()) return;
+		file_measured_bw = transaction_size / phase_duration.value();
 	}
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> file BW %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE, file_measured_bw / 1'000'000, BLACK);
 	
 	double file_bw_limit = file_measured_bw * TOL;
 
-	if constexpr (BW_LIMIT_GRANULARITY == 3) {
+	#if BW_LIMIT_GRANULARITY == 3
 		double scale_factor = 1.0;
 
 		if (path) {
@@ -248,16 +254,16 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 
 				double scaled_limit = scale_factor * file_bw_limit;
 
-				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW scale factor: %.2f   prev: %lld B   cur: %lld B   BW new scaled goal %.2f Mb/s%s\n",
+				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW scale factor: %.2f   prev: %lld Mb   cur: %lld Mb   BW new scaled goal %.2f Mb/s%s\n",
 					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE,
-					scale_factor, prev_transaction_size, transaction_size, scaled_limit / 1'000'000, BLACK);
+					scale_factor, prev_transaction_size / 1'000'000, transaction_size / 1'000'000, scaled_limit / 1'000'000, BLACK);
 
 				file_bw_limit = scaled_limit;
 			} else {
 				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous transaction, no scaling applied");
 			}
 		}
-	}
+	#endif
 
 	if(transaction == TransactionType::Async_Write) {
 		bw_limit_iwrite += file_bw_limit;
@@ -266,6 +272,37 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::filesystem:
 		bw_limit_iread += file_bw_limit;
 		EMPI_DESIRED_BW_IREAD = bw_limit_iread;
 	}
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW overall: %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE, (write? bw_limit_iwrite : bw_limit_iread) / 1'000'000, BLACK);
+}
+
+void Bw_limit::limit_checkpoint(long long transaction_size, double max_duration) {
+	std::lock_guard lock(bw_lock);
+
+	if (!p_aw->phase_active()) { // TODO check phase done
+		set_throughput_impl(TransactionType::Async_Write);
+		bw_limit_iwrite = 0.0;
+	}
+
+	auto phase_duration = p_aw->get_last_phase_duration();
+
+	if (!phase_duration) return;
+
+	double transaction_time = std::min(phase_duration.value(), max_duration);
+
+	double bw = static_cast<double>(transaction_size) / transaction_time;
+	double chkpt_bw_limit = bw * TOL;
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW, "checkpoint write", BLUE, chkpt_bw_limit / 1'000'000, BLACK);
+
+	bw_limit_iwrite += chkpt_bw_limit;
+	EMPI_DESIRED_BW_IWRITE = bw_limit_iwrite;
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW overall: %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW, "checkpoint write", BLUE, bw_limit_iwrite / 1'000'000, BLACK);
+
 }
 
 #endif
@@ -298,15 +335,15 @@ void Bw_limit::limit_async_impl(TransactionType transaction) {
 
 	double measured_bw = 0.0;
 
-	if constexpr (BW_LIMIT_FTIO == 1) {
+	#if BW_LIMIT_FTIO == 1
 		if(ftio_phase_pred < 0.0) {
-			measured_bw = Bw_limit::get_phase_info(transaction, "B_sum");
+			measured_bw = Bw_limit::get_last_phase_info(transaction, "B_sum").value();
 		} else {
-			measured_bw = Bw_limit::get_phase_info(transaction, "data") / ftio_phase_pred;
+			measured_bw = Bw_limit::get_last_phase_info(transaction, "data").value() / ftio_phase_pred;
 		}
-	} else {
-		measured_bw = Bw_limit::get_phase_info(transaction, "B_sum");
-	}
+	#else
+		measured_bw = Bw_limit::get_last_phase_info(transaction, "B_sum").value();
+	#endif
 
 	double& prev_bw_limit = (transaction == TransactionType::Async_Write)? bw_limit_iwrite : bw_limit_iread;
 
@@ -351,10 +388,8 @@ double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_
 	} else if constexpr (BW_LIMIT_STRATEGY == 2) {
 		if (pot_limit < prev_bw_limit) // limit the downside
 			pot_limit = pot_limit + abs(pot_limit - prev_bw_limit) / 2;
-
-	} else { // just take the new limit
-		pot_limit;
 	}
+	// else just take pot_limit as is
 	return pot_limit;
 }
 
@@ -397,6 +432,7 @@ double Bw_limit::set_throughput_impl(TransactionType tt)
 {
 	long& empi_data = (tt == TransactionType::Async_Write)? EMPI_DATA_IWRITE : EMPI_DATA_IREAD;
 	long& empi_utime = (tt == TransactionType::Async_Write)? EMPI_UTIME_IWRITE : EMPI_UTIME_IREAD;
+	if(empi_data == 0 || empi_utime == 0) return 0;
 
 	double phase_throughput = (static_cast<double>(empi_data)) / (static_cast<double>(empi_utime) / 1'000'000);
 
@@ -404,9 +440,9 @@ double Bw_limit::set_throughput_impl(TransactionType tt)
 	Bw_limit::set_phase_info(tt, "T_avr", phase_throughput);
 	Bw_limit::set_phase_info(
 		tt, "t_end_act",
-		Bw_limit::get_phase_info(tt, "t_start") + static_cast<double>(empi_utime) / 1'000'000);
+		Bw_limit::get_last_phase_info(tt, "t_start").value() + static_cast<double>(empi_utime) / 1'000'000);
 
-	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> T set to(%.2f) Mb/s %s\n",
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> T set to %.2f Mb/s %s\n",
 			caller, rank, processes - 1, YELLOW, (tt == TransactionType::Async_Write)? "async_write" : "async_read",
 			BLUE, phase_throughput / 1'000'000, BLACK);
 
@@ -423,30 +459,11 @@ double Bw_limit::set_throughput_impl(TransactionType tt)
 //*                               1. receive_dominant_frequency
 //************************************************************************************
 /**
- * @brief Receive dominant frequency from FTIO via ZMQ
+ * @brief set dominant io frequency
  *
  */
-void Bw_limit::receive_dominant_frequency(int rank, MPI_Comm IO_WORLD) {
+void Bw_limit::set_io_frequency(double dominant_frequency) {
 	std::lock_guard lock(bw_lock);
-
-	double dominant_frequency = -1.0;
-
-	if (rank == 0) {
-		zmq::context_t context(1);
-		zmq::socket_t receiver(context, ZMQ_PULL);
-		receiver.connect("tcp://127.0.0.1:5556");
-		
-		zmq::message_t msg;
-		receiver.recv(&msg, ZMQ_DONTWAIT);
-
-		if (!msg.empty()) {
-			std::memcpy(&dominant_frequency, msg.data(), sizeof(double));
-		}
-	}
-
-	int root = 0;
-
-	MPI_Bcast(&dominant_frequency, 1, MPI_DOUBLE, 0, IO_WORLD);
 
 	if (dominant_frequency > 0.0) {
 		ftio_phase_pred = 1.0 / dominant_frequency;

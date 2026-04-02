@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <shared_mutex>
 #include <mutex>
+#include <optional>
 #include "ioprint.h"
 
 /**
@@ -78,7 +79,7 @@ public:
     
     //? for Async tracing 
     void Phase_End_Act(long long,double,double,bool);
-    void Phase_End_Req(long long,double,double, const std::filesystem::path*);
+    void Phase_End_Req(long long,double,double, const std::optional<std::filesystem::path>);
     
     //? for Sync tracing 
     void Phase_End_Sync(double);
@@ -101,11 +102,14 @@ public:
 
     TransactionType get_transaction_type();
     const char* type_string(TransactionType);
+    bool phase_active();
     bool is_async();
     bool is_write();
-    double get_last_phase_info(std::string);
+    std::optional<double> get_last_phase_info(std::string);
+    std::optional<double> get_last_phase_duration();
     void set_last_phase_info(std::string, double);
     size_t get_phase_count();
+    void close_sync_phase();
 
 #if BW_LIMIT_GRANULARITY > 1
     double get_prev_file_bw(const std::filesystem::path&);
@@ -123,9 +127,11 @@ private:
     long long count_opertaions_agg(long long);  //counts all operations bellow input
     long long online_counter;
 
+    void Phase_End_Sync_Impl(double);
+
     //? add I/O traces
     void Add_IO_Act_Impl(long long,double,double);
-    void Add_IO_Req(long long,double,double, const std::filesystem::path*);
+    void Add_IO_Req(long long,double,double, const std::optional<std::filesystem::path>);
 
     //? Debug
     void Debug_Info_Bandwidth_In_Phase(void);

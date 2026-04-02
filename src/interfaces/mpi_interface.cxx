@@ -90,9 +90,10 @@ int MPI_File_close(MPI_File *fh)
 int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	if constexpr (BW_LIMIT_GRANULARITY > 1) 
-		mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
-	mpi_iotrace.Write_Async_Start(count, datatype, request);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
+#endif
+	mpi_iotrace.Write_Async_Start(count, datatype, request, fh);
 	return PMPI_File_iwrite(fh, buf, count, datatype, request);
 }
 
@@ -102,9 +103,10 @@ int MPI_File_iwrite(MPI_File fh, const void *buf, int count, MPI_Datatype dataty
 int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	if constexpr (BW_LIMIT_GRANULARITY > 1) 
-		mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
-	mpi_iotrace.Write_Async_Start(count, datatype, request, offset);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
+#endif
+	mpi_iotrace.Write_Async_Start(count, datatype, request, fh, offset);
 	return PMPI_File_iwrite_at(fh, offset, buf, count, datatype, request);
 }
 
@@ -114,7 +116,7 @@ int MPI_File_iwrite_at(MPI_File fh, MPI_Offset offset, const void *buf, int coun
 int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request, fh);
 	return PMPI_File_iwrite_all(fh, buf, count, datatype, request);
 }
 
@@ -124,7 +126,7 @@ int MPI_File_iwrite_all(MPI_File fh, const void *buf, int count, MPI_Datatype da
 int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Write_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request, fh);
 	return PMPI_File_iwrite_at_all(fh, offset, buf, count, datatype, request);
 }
 
@@ -134,9 +136,10 @@ int MPI_File_iwrite_at_all(MPI_File fh, MPI_Offset offset, const void *buf, int 
 int MPI_File_iwrite_shared(MPI_File fh, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	if constexpr (BW_LIMIT_GRANULARITY > 1) 
-		mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
-	mpi_iotrace.Write_Async_Start(count, datatype, request);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(true, fh, count, datatype);
+#endif
+	mpi_iotrace.Write_Async_Start(count, datatype, request, fh);
 	return PMPI_File_iwrite_shared(fh, buf, count, datatype, request);
 }
 
@@ -215,10 +218,10 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 		CallSignature(fh, count, datatype, 0, CallSignature::CallType::Read);
 	return prefetcher.retrieve_read_asnyc(cs, request, buf);
 #else
-	if constexpr (BW_LIMIT_GRANULARITY > 1) 
-		mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
-
-	mpi_iotrace.Read_Async_Start(count, datatype, request);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
+#endif
+	mpi_iotrace.Read_Async_Start(count, datatype, request, fh);
 	return PMPI_File_iread(fh, buf, count, datatype, request);
 #endif
 }
@@ -234,9 +237,10 @@ int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_
 		CallSignature(fh, count, datatype, 0, CallSignature::CallType::ReadAt);
 	return prefetcher.retrieve_read_asnyc(cs, request, buf);
 #else
-	if constexpr (BW_LIMIT_GRANULARITY > 1)
-		mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
-	mpi_iotrace.Read_Async_Start(count, datatype, request);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
+#endif
+	mpi_iotrace.Read_Async_Start(count, datatype, request, fh);
 	return PMPI_File_iread_at(fh, offset, buf, count, datatype, request);
 #endif
 }
@@ -247,7 +251,7 @@ int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_
 int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request, fh);
 	return PMPI_File_iread_all(fh, buf, count, datatype, request);
 }
 
@@ -257,7 +261,7 @@ int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype,
 int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request);
+	mpi_iotrace.Read_Async_Start(count / mpi_iotrace.Get_Relevant_Ranks(fh), datatype, request, fh);
 	return PMPI_File_iread_at_all(fh, offset, buf, count, datatype, request);
 }
 
@@ -267,9 +271,10 @@ int MPI_File_iread_at_all(MPI_File fh, MPI_Offset offset, void *buf, int count, 
 int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	if constexpr (BW_LIMIT_GRANULARITY > 1) 
-		mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
-	mpi_iotrace.Read_Async_Start(count, datatype, request);
+#if BW_LIMIT_GRANULARITY > 1
+	mpi_iotrace.apply_file_specific_bw(false, fh, count, datatype);
+#endif
+	mpi_iotrace.Read_Async_Start(count, datatype, request, fh);
 	return PMPI_File_iread_shared(fh, buf, count, datatype, request);
 }
 
@@ -436,6 +441,14 @@ int MPI_Testall(int count, MPI_Request *requests, int *flag, MPI_Status *statuse
 #endif
 #endif
 	return result;
+}
+
+int Write_Checkpoint(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request, std::chrono::steady_clock::time_point finish_time)
+{
+	Function_Debug(__PRETTY_FUNCTION__);
+	mpi_iotrace.apply_checkpoint_limit(count, datatype, finish_time);
+	mpi_iotrace.Write_Async_Start(count, datatype, request, fh, offset);
+	return PMPI_File_iwrite_at(fh, offset, buf, count, datatype, request);
 }
 
 #endif // ENABLE_MPI_TRACE
