@@ -2,7 +2,8 @@
 #define MPI_INTERFACE_H
 #include "tmio.h"
 
-extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code 
+extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code
+extern Prefetcher prefetcher;
 
 //! -----------------------
 //! Traced MPI Function 
@@ -49,7 +50,5 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status);
 int MPI_Waitall(int count, MPI_Request requests[], MPI_Status statuses[]);
 int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status);
 int MPI_Testall(int count, MPI_Request* requests, int* flag, MPI_Status* statuses);
-
-int Write_Checkpoint(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request, std::chrono::steady_clock::time_point finish_time);
 #endif // MPI_INTERFACE_H
 

@@ -44,6 +44,11 @@ enum class VerbosityLevel {
 constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
 
+#ifndef PREFETCH_VERBOSE
+#define PREFETCH_VERBOSE 0 //set debug level for iodata.cxx
+constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFETCH_VERBOSE);
+#endif
+
 #ifndef IOANALYSIS_VERBOSE
 #define IOANALYSIS_VERBOSE 0 //set debug level for ioanalysis.cxx
 #endif
@@ -57,7 +62,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef BW_LIMIT_VERBOSE
-#define BW_LIMIT_VERBOSE 4 //controls debug of bw_limit in  bw_limit.cxx
+#define BW_LIMIT_VERBOSE 0 //controls debug of bw_limit in  bw_limit.cxx
 constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 #endif
 
@@ -126,7 +131,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 
 #ifndef FUNCTION_INFO
-#define FUNCTION_INFO 3
+#define FUNCTION_INFO 0
 // 0: No function tracing
 // 1: Directly print the function tracing to stdout
 // 2: Enhanced function tracing, which includes:
@@ -225,7 +230,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 
 #ifndef BW_LIMIT_GRANULARITY
-#define BW_LIMIT_GRANULARITY 3
+#define BW_LIMIT_GRANULARITY 1
 // 0 No Limit
 // 1 By phase
 // 2 By file
@@ -241,9 +246,11 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 
 #ifndef PREFETCH
 #define PREFETCH 0 // If set to 1, prefetch MPI calls
+
+#if FILE_FORMAT == 3
+#define PREFETCH_FREQ
 #endif
-
-
+#endif
 
 //* Other Settings
 //*******************************
