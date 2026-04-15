@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <mpi.h>
 #include "iotrace.h"
+#include "prefetch.h"
 #include "tmio_helper_functions.h"
 
 /**
@@ -31,6 +32,18 @@
 namespace tmio {
     inline void iotrace_summary() {
         ::iotrace_summary(); // Call the C-compatible function
+    }
+
+    inline void init_prefetcher(double io_frequency, size_t max_cache_bytes, size_t max_file_bytes) {
+        ::init_prefetcher(io_frequency, max_cache_bytes, max_file_bytes);
+    }
+
+    inline int Write_Checkpoint(MPI_File fh, MPI_Offset offset, const void *buf, int count, MPI_Datatype datatype, MPI_Request *request, double durations_sec) {
+        return ::Write_Checkpoint(fh, offset, buf, count, datatype, request, durations_sec);
+    }
+
+    inline void set_io_freqency(double frequency) {
+        ::set_io_freqency(frequency);
     }
 }
 

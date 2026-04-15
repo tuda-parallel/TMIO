@@ -195,9 +195,10 @@ void IOtraceMPI::apply_file_specific_bw(bool write, MPI_File fd, int count, MPI_
 }
 #endif
 
-void IOtraceMPI::apply_checkpoint_limit(int count, MPI_Datatype datatype, std::chrono::steady_clock::time_point finish_time) {
+void IOtraceMPI::apply_checkpoint_limit(int count, MPI_Datatype datatype, double duration_sec) {
+    if (duration_sec < 0) duration_sec = 0.0;
     int data_size_write;
     MPI_Type_size(datatype, &data_size_write);
     long long transaction_bytes = static_cast<long long>(count) * data_size_write;
-    apply_checkpoint_limit_impl(transaction_bytes, finish_time);
+    apply_checkpoint_limit_impl(transaction_bytes, duration_sec);
 }
