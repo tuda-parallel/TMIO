@@ -89,6 +89,11 @@ private:
 	char caller[12] = "\tBw_limit";
 	int rank;
 	int processes;
+	
+	double total_file_limit_read;
+	double total_file_limit_write;
+	double last_phase_read_bw;
+	double last_phase_write_bw;
 
 	double counter_read;   // used to indicate when the sync write operations increase
 	double counter_write;  // used to indicate when the sync read operations increase
