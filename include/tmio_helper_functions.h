@@ -64,6 +64,10 @@ namespace functiontracing
     FunctionTracer &get_tracer();
 }
 
+#if BW_LIMIT_FTIO == 1 
+double retrieve_FTIO_frequency();
+#endif
+
 // std::atomic<uint64_t> request_id_counter(0);
 // uint64_t generate_unique_id()
 // {
