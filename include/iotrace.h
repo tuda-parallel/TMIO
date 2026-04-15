@@ -108,12 +108,13 @@ public:
 	//*************************************
 	void Set(std::string, bool);
 
-	void retrieve_FTIO_frequency(int, MPI_Comm);
-
+#if BW_LIMIT_FTIO == 1
+	void set_bw_limit_freq(double frequency);
+#endif
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw_impl(bool, FDType, long long);
 #endif
-	void apply_checkpoint_limit_impl(long long, std::chrono::steady_clock::time_point);
+	void apply_checkpoint_limit_impl(long long, double);
 #if BW_LIMIT_GRANULARITY == 1
 	void apply_bw_limit(void);
 #endif
@@ -127,8 +128,8 @@ protected:
 	bool open;		 	 // flag indicating file status
 
 	// FIXME: Use function local varaibel to replace the thread_local ones
-	inline static thread_local long long t_sync_read_start;
-	inline static thread_local long long t_sync_write_start;
+	inline static thread_local double t_sync_read_start;
+	inline static thread_local double t_sync_write_start;
 
 	// FIXME: Use function local varaibel to replace the thread_local ones
 	inline static thread_local long long size_sync_write;	// size of sync write operation in KB
@@ -289,19 +290,19 @@ public:
 	//*************************************
 	//* MPI Write tracing
 	//*************************************
-	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset = 0);
+	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset);
 	void Write_Async_End(MPI_Request *, int write_status = 1);
 	void Write_Async_Required(MPI_Request *);
-	void Write_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
+	void Write_Sync_Start(int, MPI_Datatype, MPI_Offset offset);
 	void Write_Sync_End();
 
 	//*************************************
 	//* MPI Read tracing
 	//*************************************
-	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset = 0);
+	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset);
 	void Read_Async_End(MPI_Request *request, int read_status = 1);
 	void Read_Async_Required(MPI_Request *);
-	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
+	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset);
 	void Read_Sync_End();
 
 	//*************************************
@@ -310,7 +311,7 @@ public:
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw(bool, MPI_File, int, MPI_Datatype);
 #endif
-	void apply_checkpoint_limit(int count, MPI_Datatype datatype, std::chrono::steady_clock::time_point finish_time);
+	void apply_checkpoint_limit(int count, MPI_Datatype datatype, double finish_time);
 #ifdef CUSTOM_MPI
 	void set_custom_throughput(void);
 #endif

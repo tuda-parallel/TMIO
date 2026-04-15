@@ -199,10 +199,6 @@ void IOtraceBase<Tag>::Summary(void)
 
     // printf("%s > rank %i > generating I/O summary end  %f \n", caller, rank,MPI_Wtime() - t_0);
 
-#if BW_LIMIT_FTIO == 1 || PREFETCH == 1
-    retrieve_FTIO_frequency(rank, IO_WORLD);
-#endif
-
     //? Overhead calculation
     //?-------------------------
     double *time = Overhead_Calculation();
@@ -411,8 +407,6 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
         async_read_queue_act.push_back(1);
     }
 
-    // phase start if first request. Add phase data and offset
-
     // Logging
     IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
         "%s > rank %i %s>> started async read @ %.2f s %s\n", caller, rank,
@@ -518,7 +512,7 @@ void IOtraceBase<Tag>::Write_Sync_End_Impl(void)
 {
     double t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
-    p_sw->Add_IO_Act(size_sync_write, t_sync_write_end, t_sync_write_end);
+    p_sw->Add_IO_Act(size_sync_write, t_sync_write_start, t_sync_write_end);
 
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
@@ -945,13 +939,11 @@ void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long l
 #endif
 
 template <typename Tag>
-void IOtraceBase<Tag>::apply_checkpoint_limit_impl(long long transaction_size, std::chrono::steady_clock::time_point finish_time)
+void IOtraceBase<Tag>::apply_checkpoint_limit_impl(long long transaction_size, double duration_sec)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    std::chrono::duration checkpoint_duration = finish_time - std::chrono::steady_clock::now();
-    auto checkpoint_sec = std::chrono::duration<double>(checkpoint_duration).count();
 #ifdef BW_LIMIT
-    bw_limit.limit_checkpoint(transaction_size, checkpoint_sec);
+    bw_limit.limit_checkpoint(transaction_size, duration_sec);
 #endif
     Overhead_End();
 }
@@ -986,28 +978,8 @@ void IOtraceBase<Tag>::set_custom_throughput(void){
 
 #if BW_LIMIT_FTIO == 1
 template <typename Tag>
-void IOtraceBase<Tag>::retrieve_FTIO_frequency(int rank, MPI_Comm IO_WORLD) {
-    double dominant_frequency = -1.0;
-
-	if (rank == 0) {
-		zmq::context_t context(1);
-		zmq::socket_t receiver(context, ZMQ_PULL);
-		receiver.connect("tcp://127.0.0.1:5556");
-		
-		zmq::message_t msg;
-		auto res = receiver.recv(msg, zmq::recv_flags::dontwait);
-
-		if (res.has_value() && res.value() == 0 && !msg.empty()) {
-			std::memcpy(&dominant_frequency, msg.data(), sizeof(double));
-		}
-	}
-
-	int root = 0;
-
-	MPI_Bcast(&dominant_frequency, 1, MPI_DOUBLE, 0, IO_WORLD);
-
-    bw_limit.set_io_frequency();
-
+void IOtraceBase<Tag>::set_bw_limit_freq(double frequency) {
+    bw_limit.set_io_frequency(frequency);
 }
 
 #endif

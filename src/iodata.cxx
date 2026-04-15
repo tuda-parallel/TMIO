@@ -19,7 +19,7 @@ void IOdata::Mode(int rank, TransactionType tt)
     #endif
 
 #if IODATA_VERBOSE >= 2
-    printf("%s > rank %i %s> collecting data for %s%s\n", caller, rank, CYAN, type_string(), BLACK);
+    printf("%s > rank %i %s> collecting data for %s%s\n", caller, rank, CYAN, type_string(tt), BLACK);
 #endif
 }
 
@@ -474,7 +474,6 @@ long long IOdata::count_opertaions(long long a)
 {
     long long counter = 0;
 
-    std::shared_lock lock(phase_data_lock);
     for (unsigned int i = 0; i < phases.size(); i++)
     {
         if (phases[i] == a)
@@ -487,8 +486,6 @@ long long IOdata::count_opertaions(long long a)
 long long IOdata::count_opertaions_agg(long long a)
 {
     long long counter = 0;
-
-    std::shared_lock lock(phase_data_lock);
     for (int i = 0; i < a; i++)
     {
             counter += phase_data[i].n_op;
@@ -540,7 +537,7 @@ void IOdata::Bandwidth_In_Phase_Offline(void)
     }
 
     if (phases.size() > 0){
-        for (int i = 0; i <= phase_data.size(); i++)
+        for (size_t i = 0; i <= phase_data.size(); i++)
         {
             
             phase_data[i].T_avr = phase_data[i].data / (phase_data[i].t_end_act - phase_data[i].t_start);
