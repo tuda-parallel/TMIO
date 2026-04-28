@@ -34,6 +34,10 @@ namespace tmio {
         ::iotrace_summary(); // Call the C-compatible function
     }
 
+    inline void retrieve_frequencies() {
+        ::retrieve_FTIO_frequency();
+    }
+
     inline void init_prefetcher(double io_frequency, size_t max_cache_bytes, size_t max_file_bytes) {
         ::init_prefetcher(io_frequency, max_cache_bytes, max_file_bytes);
     }

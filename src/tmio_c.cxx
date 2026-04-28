@@ -8,14 +8,15 @@ extern "C"
 	{
 #if ENABLE_MPI_TRACE == 1
 		mpi_iotrace.Summary();
-#if BW_LIMIT_FTIO == 1 || PREFETCH_FREQ == 1
+#if FETCH_FTIO_FREQ
 		// Get results from last summary call
-		double freq = retrieve_FTIO_frequency();
-#if PREFETCH_FREQ == 1
-		prefetcher.set_io_frequency(freq);
+		double frequency, confidence;
+		retrieve_FTIO_frequency(frequency, confidence);
+#if PREFETCH == 1
+		prefetcher.set_io_frequency(frequency);
 #endif
-#if BW_LIMIT_FTIO == 1
-		mpi_iotrace.set_bw_limit_freq(freq);
+#if BW_LIMIT_FREQ == 1
+		mpi_iotrace.set_bw_limit_freq(frequency);
 #endif
 #endif
 #endif
@@ -46,11 +47,25 @@ extern "C"
 	}
 
     void set_io_freqency(double frequency) {
-#if PREFETCH == 1
+#if PREFETCH == 1 & ENABLE_MPI_TRACE == 1
 		prefetcher.set_io_frequency(frequency);
 #endif
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 		mpi_iotrace.set_bw_limit_freq(frequency);
 #endif
     }
+
+	void retrieve_FTIO_frequency() {
+#if FETCH_FTIO_FREQ == 1
+		// Get results from last summary call
+		double frequency, confidence;
+		retrieve_FTIO_frequency(frequency, confidence);
+#if PREFETCH == 1
+		prefetcher.set_io_frequency(frequency);
+#endif
+#if BW_LIMIT_FREQ == 1
+		mpi_iotrace.set_bw_limit_freq(frequency);
+#endif
+#endif
+	}
 }
