@@ -1,14 +1,15 @@
 #ifndef IO_DATA_H
 #define IO_DATA_H
 
+#include "file_tracker.h"
+#include "ioprint.h"
+#include <map>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
 #include <stdio.h>
 #include <string.h>
 #include <unordered_map>
-#include <filesystem>
-#include <shared_mutex>
-#include <mutex>
-#include <optional>
-#include "ioprint.h"
 
 /**
  *  IO trace class
@@ -55,8 +56,14 @@ private:
     std:: vector<double>    t_req_e;  // required end time
     std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-#if BW_LIMIT_GRANULARITY > 1
-    std:: unordered_map<std::filesystem::path, std::vector<size_t>> path_to_io;   // I/O operations for each file
+#if BW_LIMIT_GRANULARITY > 2
+    struct file_stats {
+        std::vector<size_t> indexes;
+        std::map<size_t, size_t> phase_count;
+        std::map<size_t, size_t> phase_accesses;
+    };
+
+    std:: unordered_map<PathID, file_stats> path_to_io;   // I/O operations for each file
 #endif
     //*******************************
     //* Phase information 
@@ -71,7 +78,7 @@ public:
     IOdata();
     void Mode(int,TransactionType); // set if read or write and if actual or required
     //? phase start
-    void Phase_Start(bool,double,long long,long long );
+    void Phase_Start(bool,double,long long,long long,const std::optional<PathID> = std::nullopt);
     
     //? clear all I/O traces
     void Clear_IO(void);
@@ -79,7 +86,7 @@ public:
     
     //? for Async tracing 
     void Phase_End_Act(long long,double,double,bool);
-    void Phase_End_Req(long long,double,double, const std::optional<std::filesystem::path>);
+    void Phase_End_Req(long long,double,double, const std::optional<PathID>);
     
     //? for Sync tracing 
     void Phase_End_Sync(double);
@@ -111,11 +118,8 @@ public:
     size_t get_phase_count();
     void close_sync_phase();
 
-#if BW_LIMIT_GRANULARITY > 1
-    double get_prev_file_bw(const std::filesystem::path&);
-#endif
-#if BW_LIMIT_GRANULARITY == 3
-    long long get_prev_file_size(const std::filesystem::path&);
+#if BW_LIMIT_GRANULARITY > 2
+    bool get_prev_phase_file_stats(const PathID&, long long&, double&);
 #endif
     
     //? calucalte the Bandwidth after the application finishes
@@ -131,7 +135,7 @@ private:
 
     //? add I/O traces
     void Add_IO_Act_Impl(long long,double,double);
-    void Add_IO_Req(long long,double,double, const std::optional<std::filesystem::path>);
+    void Add_IO_Req(long long,double,double, const std::optional<PathID>);
 
     //? Debug
     void Debug_Info_Bandwidth_In_Phase(void);

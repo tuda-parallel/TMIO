@@ -33,11 +33,13 @@ void IOdata::Mode(int rank, TransactionType tt)
  * @note    Should only be called with data_lock engaged
  * @details Adds IO operation to tracked data
  */
-void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<std::filesystem::path> path)
+void IOdata::Add_IO_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<PathID> path)
 {
-#if BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 2
     if (path) {
-        path_to_io.try_emplace(*path).first->second.push_back(bandwidth_req.size());
+        auto& fs = path_to_io.try_emplace(*path).first->second;
+        fs.indexes.push_back(bandwidth_req.size());
+        fs.phase_count[phases[bandwidth_req.size()]]++;
     }
 #endif
 #if SAME_T_END == 1
@@ -116,7 +118,7 @@ void IOdata::Clear_IO(void)
     t_req_e.clear();
     phases.clear();
     phase_data.clear();
-#if BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 2
     path_to_io.clear();
 #endif
 }
@@ -148,7 +150,7 @@ void IOdata::Add_IO_Act(long long b, double ts, double te) {
  * \e Phase_End_Req is reached and the flag \e phase is unset. For the throughout, the end of the 
  * phase is indicated by \e Act_Done. 
  */
-void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
+void IOdata::Phase_Start(bool condition, double t, long long b, long long of, [[maybe_unused]] const std::optional<PathID> path)
 {
     std::lock_guard lock(phase_data_lock);
     //if first time, start phase
@@ -169,7 +171,12 @@ void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
     phase_data.back().n_op += 1;
     // record current phase
     phases.push_back(phase_data.size());
-    
+
+#if BW_LIMIT_GRANULARITY > 2
+    if(path) {
+        path_to_io.try_emplace(*path).first->second.phase_accesses[phase_data.size()]++;
+    }
+#endif
     // record current offset
     //offset.push_back(of);
 
@@ -192,7 +199,7 @@ void IOdata::Phase_Start(bool condition, double t, long long b, long long of)
  * @details \e Phase_Start_Req sets the flag \e phase to active during the first call. During the first call to this function 
  * the flag becomes false and the required phase ends. 
  */
-void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<std::filesystem::path> path)
+void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] const std::optional<PathID> path)
 {
 
     std::lock_guard lock(phase_data_lock);
@@ -442,32 +449,32 @@ void IOdata::clear_phase_data() {
     phase_data.clear();
 }
 
-#if BW_LIMIT_GRANULARITY > 1
-double IOdata::get_prev_file_bw(const std::filesystem::path& path)
+#if BW_LIMIT_GRANULARITY > 2
+bool IOdata::get_prev_phase_file_stats(const PathID& path, long long& request_size, double& bw)
 {
-    double res = -1.0;
     std::shared_lock lock(phase_data_lock);
     auto it = path_to_io.find(path);
-    if (it != path_to_io.end()) {
-        size_t index = it->second.back();
-        res = bandwidth_req[index];
-    }
-    return res;
-}
-#endif
+    if (it == path_to_io.end()) return false;
+    
+    if(it->second.phase_count.empty()) return false;
 
-#if BW_LIMIT_GRANULARITY == 3
-long long IOdata::get_prev_file_size(const std::filesystem::path& path)
-{
-    long long res = 0;
-    std::shared_lock lock(phase_data_lock);
-    auto it = path_to_io.find(path);
-    if (it != path_to_io.end()) {
-        size_t index = it->second.back();
-        res = bytes[index];
+    int previous_calls = 0;
+    if(phase) {
+        previous_calls = it->second.phase_accesses[phase_data.size()];
     }
-    return res;
+
+    int last_phase_calls = it->second.phase_count.rbegin()->second;
+
+    auto index_idx = last_phase_calls <= previous_calls? 
+        it->second.indexes.size() - 1 : it->second.indexes.size() - last_phase_calls + previous_calls;
+    auto stat_idx = it->second.indexes[index_idx];
+
+    bw = bandwidth_req[stat_idx];
+    request_size = bytes[stat_idx];
+
+    return true;
 }
+
 #endif
 
 long long IOdata::count_opertaions(long long a)

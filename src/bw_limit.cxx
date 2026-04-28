@@ -2,10 +2,6 @@
 
 #include <algorithm>
 
-#if BW_LIMIT_FTIO == 1 
-#include <zmq.hpp>
-#endif
-
 
 #if defined CUSTOM_MPI || defined BW_LIMIT
 extern long int EMPI_DATA_READ;
@@ -174,7 +170,7 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 	EMPI_DATA_IREAD = 0;
 #endif 
 
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 	ftio_phase_pred = -1.0;
 #endif
 
@@ -212,22 +208,26 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 
 #if BW_LIMIT_GRANULARITY > 1
 
-void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<std::filesystem::path> path, [[maybe_unused]] long long transaction_size)
+void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<PathID> path, [[maybe_unused]] long long transaction_size)
 {
 	std::lock_guard lock(bw_lock);
 
-	if (!p_aw->phase_active()) {
+	if (write && !p_aw->phase_active()) {
 		set_throughput_impl(TransactionType::Async_Write);
+		Bw_limit::set_phase_info(TransactionType::Async_Write, "B_avr", bw_limit_iwrite);
 		last_phase_write_bw = bw_limit_iwrite;
 		bw_limit_iwrite = 0.0;
 		total_file_limit_write = 0.0;
+		EMPI_DESIRED_BW_IWRITE = 0.0;
 	}
 	
-	if (!p_ar->phase_active()) {
+	if (!write && !p_ar->phase_active()) {
 		set_throughput_impl(TransactionType::Async_Read);
+		Bw_limit::set_phase_info(TransactionType::Async_Read, "B_avr", bw_limit_iread);
 		last_phase_read_bw = bw_limit_iread;
 		bw_limit_iread = 0.0;
 		total_file_limit_read = 0.0;
+		EMPI_DESIRED_BW_IREAD = 0.0;
 	}
 
 	double file_measured_bw = 0.0;
@@ -235,43 +235,56 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<st
 	TransactionType transaction = write? TransactionType::Async_Write : TransactionType::Async_Read;
 	IOdata* p_data = write? p_aw : p_ar;
 
-	
+	#if BW_LIMIT_GRANULARITY == 2
+		auto phase_duration = p_data->get_last_phase_duration();
+		if(!phase_duration.has_value()) return;
+		file_measured_bw = transaction_size / phase_duration.value();
+	#endif
+
+	#if BW_LIMIT_GRANULARITY > 2
+	long long prev_transaction_size = 0;
+
 	if(path) {
-		file_measured_bw = p_data->get_prev_file_bw(*path);
+		p_data->get_prev_phase_file_stats(*path, prev_transaction_size, file_measured_bw);
 	}
 
 	if (file_measured_bw <= 0.0) {
 		Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous bandwidth, falling back to phase BW\n");
 		auto phase_duration = p_data->get_last_phase_duration();
+		#if BW_LIMIT_FREQ == 1
+		if(ftio_phase_pred < 0.0) {
+			if(!phase_duration.has_value()) return;
+			file_measured_bw = transaction_size / phase_duration.value();
+		} else {
+			file_measured_bw = transaction_size / ftio_phase_pred; 
+		}
+		#else
 		if(!phase_duration.has_value()) return;
-		file_measured_bw = transaction_size / phase_duration.value();
+			file_measured_bw = transaction_size / phase_duration.value();
+		#endif
 	}
+	#endif
 
 	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> file BW %.2f Mb/s %s\n",
 					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE, file_measured_bw / 1'000'000, BLACK);
-	
-	//double file_bw_limit = file_measured_bw * TOL;
 
-	#if BW_LIMIT_GRANULARITY == 3
+	#if BW_LIMIT_GRANULARITY == 4
 		double scale_factor = 1.0;
 
-		if (path) {
-			long long prev_transaction_size = p_data->get_prev_file_size(*path);
+		if(prev_transaction_size > 0) {
+			scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
 
-			if(prev_transaction_size > 0) {
-				scale_factor = static_cast<double>(transaction_size) / static_cast<double>(prev_transaction_size);
+			double scaled_limit = scale_factor * file_measured_bw;
 
-				double scaled_limit = scale_factor * file_measured_bw;
+			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW scale factor: %.2f   prev: %lld Mb   cur: %lld Mb   BW new scaled goal %.2f Mb/s%s\n",
+				caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE,
+				scale_factor, prev_transaction_size / 1'000'000, transaction_size / 1'000'000, scaled_limit / 1'000'000, BLACK);
 
-				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW scale factor: %.2f   prev: %lld Mb   cur: %lld Mb   BW new scaled goal %.2f Mb/s%s\n",
-					caller, rank, processes - 1, YELLOW,  write? "async_write" : "async_read", BLUE,
-					scale_factor, prev_transaction_size / 1'000'000, transaction_size / 1'000'000, scaled_limit / 1'000'000, BLACK);
-
-				file_measured_bw = scaled_limit;
-			} else {
-				Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous transaction, no scaling applied");
-			}
+			file_measured_bw = scaled_limit;
+		} else {
+			Bw_limit::Log<VerbosityLevel::BASIC_LOG>("No previous transaction, no scaling applied");
 		}
+		
 	#endif
 
 	if(transaction == TransactionType::Async_Write) {
@@ -289,13 +302,17 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<st
 }
 
 #endif
-
+#ifdef BW_LIMIT
 void Bw_limit::limit_checkpoint(long long transaction_size, double duration_sec) {
 	std::lock_guard lock(bw_lock);
 
 	if (!p_aw->phase_active()) {
 		set_throughput_impl(TransactionType::Async_Write);
+		Bw_limit::set_phase_info(TransactionType::Async_Write, "B_avr", bw_limit_iwrite);
+		last_phase_write_bw = bw_limit_iwrite;
 		bw_limit_iwrite = 0.0;
+		total_file_limit_write = 0.0;
+		EMPI_DESIRED_BW_IWRITE = 0.0;
 	}
 
 	auto phase_duration = p_aw->get_last_phase_duration();
@@ -311,14 +328,15 @@ void Bw_limit::limit_checkpoint(long long transaction_size, double duration_sec)
 	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW %.2f Mb/s %s\n",
 					caller, rank, processes - 1, YELLOW, "checkpoint write", BLUE, chkpt_bw_limit / 1'000'000, BLACK);
 
-	bw_limit_iwrite += chkpt_bw_limit;
+	total_file_limit_write += chkpt_bw_limit;
+	bw_limit_iwrite = Bw_limit::calculate_bw_limit(total_file_limit_write, last_phase_write_bw);
 	EMPI_DESIRED_BW_IWRITE = bw_limit_iwrite;
 
 	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW overall: %.2f Mb/s %s\n",
 					caller, rank, processes - 1, YELLOW, "checkpoint write", BLUE, bw_limit_iwrite / 1'000'000, BLACK);
 
 }
-
+#endif
 #if BW_LIMIT_GRANULARITY == 1
 
 //! --------------------------- For BW Limiting only -----------------------------------
@@ -349,7 +367,7 @@ void Bw_limit::limit_async_impl(TransactionType transaction) {
 
 	double measured_bw = 0.0;
 
-	#if BW_LIMIT_FTIO == 1
+	#if BW_LIMIT_FREQ == 1
 		if(ftio_phase_pred < 0.0) {
 			measured_bw = Bw_limit::get_last_phase_info(transaction, "B_sum").value();
 		} else {
@@ -376,6 +394,8 @@ void Bw_limit::limit_async_impl(TransactionType transaction) {
 			desired_bw / 1'000'000, phase_throughput / 1'000'000, BLACK);
 	}
 
+	Bw_limit::set_phase_info(transaction, "B_avr",desired_bw);
+
 	if(transaction == TransactionType::Async_Write) {
 		EMPI_DESIRED_BW_IWRITE = desired_bw;
 	} else {
@@ -401,7 +421,7 @@ double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_
 
 	} else if constexpr (BW_LIMIT_STRATEGY == 2) {
 		if (pot_limit < prev_bw_limit) // limit the downside
-			pot_limit = pot_limit + abs(pot_limit - prev_bw_limit) / 2;
+			return pot_limit + (abs(pot_limit - prev_bw_limit) / 2);
 	}
 	// else just take pot_limit as is
 	return pot_limit;
@@ -472,7 +492,7 @@ double Bw_limit::set_throughput_impl(TransactionType tt)
 #endif
 
 
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 //************************************************************************************
 //*                               1. receive_dominant_frequency
 //************************************************************************************
