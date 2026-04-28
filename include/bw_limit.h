@@ -2,89 +2,18 @@
 #define BW_LIMIT_H
 
 #include "iodata.h"
-#include <map>
-#include <filesystem>
+#include "ioflags.h"
 #include <cstdarg>
 #include <mutex>
-
-using TransactionType = IOdata::TransactionType;
-
-template<typename FDType, typename RequestIDType>
-class [[maybe_unused]] FileTracker {
-
-	
-private:
-	std::map<FDType, std::filesystem::path> file_register;
-	std::map<RequestIDType, std::filesystem::path> request_register;
-	std::mutex tracker_lock;
-
-public:
-	void track_file_opened(const char* path, const FDType fd)
-	{
-		std::lock_guard lock(tracker_lock);
-		// Get full unique path
-		auto full_path = std::filesystem::absolute(
-			std::filesystem::weakly_canonical(std::filesystem::path(path)));
-		file_register.insert(std::make_pair(fd, full_path));
-	};
-
-	void track_file_closed(const FDType fd) 
-	{
-		std::lock_guard lock(tracker_lock);
-		file_register.erase(fd);
-	};
-
-	std::optional<std::filesystem::path> get_fd_path(const FDType fd) 
-	{
-		std::lock_guard lock(tracker_lock);
-		auto it = file_register.find(fd);
-		if (it != file_register.end()) {
-			return it->second;
-		}
-		return {};
-	};
-
-	bool fd_valid(const FDType fd)
-	{
-		std::lock_guard lock(tracker_lock);
-		auto it = file_register.find(fd);
-		return it != file_register.end();
-	}
-
-	void register_request(const RequestIDType request_id, const FDType fd) 
-	{
-		std::lock_guard lock(tracker_lock);
-		auto it = file_register.find(fd);
-		if (it != file_register.end()) {
-			auto path = it->second;
-			request_register.insert(std::make_pair(request_id, path));
-		}
-	};
-
-	std::optional<std::filesystem::path> get_request_path(const RequestIDType request_id) 
-	{
-		std::lock_guard lock(tracker_lock);
-		auto it = request_register.find(request_id);
-		if(it != request_register.end()) {
-			return it->second;
-		}
-		return {};
-	};
-
-	void unregister_request(const RequestIDType request_id) 
-	{
-		std::lock_guard lock(tracker_lock);
-		auto it = request_register.find(request_id);
-		if(it != request_register.end()) {
-			request_register.erase(it);		
-		}
-	};
-};
+#include <optional>
+#include <string>
 
 class Bw_limit
 {
 
 private:
+	using TransactionType = IOdata::TransactionType;
+
 	std::mutex bw_lock;
 	char caller[12] = "\tBw_limit";
 	int rank;
@@ -105,11 +34,11 @@ private:
 	IOdata *p_sw;
 	IOdata *p_sr;
 
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 	double ftio_phase_pred;
 #endif
 
-#if defined BW_LIMIT
+#ifdef BW_LIMIT
 	double scale_bw_write;	// scales the bandwidth limit of sync write operations
 	double scale_bw_read;	// scales the bandwidth limit of sync read operations
 	double scale_bw_iwrite; // scales the bandwidth limit of async write operations
@@ -154,7 +83,7 @@ public:
 	void Reset(void);
 	void Init(int, int, IOdata *, IOdata *, IOdata *, IOdata *);
 
-#if defined CUSTOM_MPI
+#ifdef CUSTOM_MPI
 	void set_throughput();
 #endif
 
@@ -163,12 +92,12 @@ public:
 #endif
 
 #if BW_LIMIT_GRANULARITY > 1
-	void limit_by_file(bool, [[maybe_unused]] const std::optional<std::filesystem::path> path, [[maybe_unused]] long long transaction_size);
+	void limit_by_file(bool, [[maybe_unused]] const std::optional<PathID> path, [[maybe_unused]] long long transaction_size);
 #endif
-
+#ifdef BW_LIMIT
 	void limit_checkpoint(long long transaction_size, double end_time);
-
-#if BW_LIMIT_FTIO == 1
+#endif
+#if BW_LIMIT_FREQ == 1
 	void set_io_frequency(double);
 #endif
 
