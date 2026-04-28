@@ -4,9 +4,10 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <time.h>
-#include <liburing.h>
 
 #if ENABLE_IOURING_TRACE == 1
+#include <liburing.h>
+
 IOtraceIOuring &get_iouring_iotrace()
 {
     // This is thread_local, ensuring each thread gets its own instance of the tracer.

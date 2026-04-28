@@ -3,8 +3,9 @@
 #include "tmio.h"
 
 extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code
+#if PREFETCH == 1
 extern Prefetcher prefetcher;
-
+#endif
 //! -----------------------
 //! Traced MPI Function 
 //! -----------------------

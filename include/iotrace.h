@@ -1,23 +1,26 @@
 #ifndef IOTRACE_H
 #define IOTRACE_H
 
-#include "tmio_helper_functions.h"
 #include "ioanalysis.h"
-#include <shared_mutex>
-#include <mutex>
-#include <cstdarg>
+#include "tmio_helper_functions.h"
 #include <atomic>
+#include <cstdarg>
+#include <mutex>
+#include <shared_mutex>
+#if ENABLE_IOURING_TRACE == 1
 #include <liburing.h>
-#include <unordered_map>
-#include <thread>
-#include <condition_variable>
-#include <vector>
+#endif
 #include <cassert>
-#include <unordered_set>
+#include <condition_variable>
 #include <optional>
+#include <thread>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
+#include "file_tracker.h"
 #endif
 
 /**
@@ -62,7 +65,7 @@ struct IOtraceTraits<Libc_Tag>
 
 	static constexpr const char *Name = "Libc";
 };
-
+#if ENABLE_IOURING_TRACE == 1
 struct IOuring_Tag
 {
 };
@@ -78,6 +81,7 @@ struct IOtraceTraits<IOuring_Tag>
 
 	static constexpr const char *Name = "IOuring";
 };
+#endif
 
 template <typename Tag>
 class IOtraceBase
@@ -108,7 +112,7 @@ public:
 	//*************************************
 	void Set(std::string, bool);
 
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 	void set_bw_limit_freq(double frequency);
 #endif
 #if BW_LIMIT_GRANULARITY > 1
@@ -170,7 +174,7 @@ protected:
 	Bw_limit bw_limit;
 #endif
 
-#if BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 2
 	FileTracker<FDType, RequestIDType> file_tracker;
 #endif
 
@@ -311,9 +315,8 @@ public:
 #if BW_LIMIT_GRANULARITY > 1
 	void apply_file_specific_bw(bool, MPI_File, int, MPI_Datatype);
 #endif
+#ifdef BW_LIMIT
 	void apply_checkpoint_limit(int count, MPI_Datatype datatype, double finish_time);
-#ifdef CUSTOM_MPI
-	void set_custom_throughput(void);
 #endif
 };
 
@@ -357,7 +360,7 @@ public:
 	void Read_Sync_End();
 	void Batch_Read_Sync_End();
 };
-
+#if ENABLE_IOURING_TRACE == 1
 class IOtraceIOuring final : public IOtraceBase<IOuring_Tag>
 {
 public:
@@ -490,5 +493,5 @@ private:
     void Read_Async_End(RequestIDType requestID, int status);
     void Read_Async_Required(RequestIDType requestID);
 };
-
+#endif
 #endif // IOTRACE_H

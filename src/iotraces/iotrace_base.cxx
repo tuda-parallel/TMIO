@@ -280,9 +280,12 @@ template <typename Tag>
 void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, [[maybe_unused]] std::optional<FDType> fd)
 {
     Overhead_Start(start_time);
-#if BW_LIMIT_GRANULARITY > 1
-    if(fd)
+    std::optional<PathID> path = std::nullopt;
+#if BW_LIMIT_GRANULARITY > 2
+    if(fd) {
+        path = file_tracker.get_fd_path(*fd);
         file_tracker.register_request(requestID, *fd);
+    }
 #endif
     {
         std::lock_guard lock(async_write_vecs_lock);
@@ -293,7 +296,7 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
         async_write_size.push_back(size);
 
         // phase start if first request. Add phase data and offset
-        p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset);
+        p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset, path);
 
         // save request flag and set request counter (required and actual to one)
         async_write_request.push_back(requestID);
@@ -326,7 +329,7 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
         //  first time the status of the actual write is quarried. Solves the problem of several MPI_Test
         if (double t_async_write_start; Check_Request_Write(request, &t_async_write_start, &size_async_write, 2))
         {
-        #if BW_LIMIT_GRANULARITY > 1
+        #if BW_LIMIT_GRANULARITY > 2
             file_tracker.unregister_request(request);
         #endif
             // add values to traced data and add phase values if condition is true:
@@ -362,8 +365,8 @@ void IOtraceBase<Tag>::Write_Async_Required_Impl(RequestIDType request)
     long long size_async_write;
     if (double t_async_write_start; Check_Request_Write(request, &t_async_write_start, &size_async_write, 1))
     {
-        std::optional<std::filesystem::path> path;
-#if BW_LIMIT_GRANULARITY > 1
+        std::optional<PathID> path;
+#if BW_LIMIT_GRANULARITY > 2
         path = file_tracker.get_request_path(request);
 #endif
         p_aw->Phase_End_Req(size_async_write, t_async_write_start, MPI_Wtime() - t_0, std::move(path));
@@ -386,9 +389,12 @@ template <typename Tag>
 void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd)
 {
     Overhead_Start(start_time);
-    #if BW_LIMIT_GRANULARITY > 1
-    if(fd)
+    std::optional<PathID> path = std::nullopt;
+#if BW_LIMIT_GRANULARITY > 2
+    if(fd) {
+        path = file_tracker.get_fd_path(*fd);
         file_tracker.register_request(requestID, *fd);
+    }
     #endif
     { // scope for async read vecs lock
         std::lock_guard lock(async_read_vecs_lock);
@@ -399,7 +405,7 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
         // determnine read size
         async_read_size.push_back(size);
         
-        p_ar->Phase_Start(async_read_request.empty(), async_read_time.back(), async_read_size.back(), offset);
+        p_ar->Phase_Start(async_read_request.empty(), async_read_time.back(), async_read_size.back(), offset, path);
 
         // save request flag and set request counter (required and actual to one)
         async_read_request.push_back(requestID);
@@ -462,8 +468,8 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
     long long size_async_read;
     if (double t_async_read_start; Check_Request_Read(request, &t_async_read_start, &size_async_read, 1))
     {
-        std::optional<std::filesystem::path> path;
-#if BW_LIMIT_GRANULARITY > 1
+        std::optional<PathID> path;
+#if BW_LIMIT_GRANULARITY > 2
         path = file_tracker.get_request_path(request);
 #endif
         p_ar->Phase_End_Req(size_async_read, t_async_read_start, MPI_Wtime() - t_0, std::move(path));
@@ -582,7 +588,7 @@ void IOtraceBase<Tag>::Open(const char *path, const FDType fd)
 {
     open = 1;
 
-#if BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 2
     Overhead_Start(MPI_Wtime() - t_0);
     file_tracker.track_file_opened(path, fd);
     Overhead_End();
@@ -609,7 +615,7 @@ void IOtraceBase<Tag>::Close(const FDType fd)
     {
         open = 0;
 
-#if BW_LIMIT_GRANULARITY > 1
+#if BW_LIMIT_GRANULARITY > 2
         Overhead_Start(MPI_Wtime() - t_0);
         file_tracker.track_file_closed(fd);
         Overhead_End();
@@ -859,14 +865,14 @@ double *IOtraceBase<Tag>::Overhead_Calculation(void)
 #endif
 
     double tmp_time[n_time];
-    tmp_time[0] = delta_t_app; // application runtime including in-period overhead, not include summary overhead
+    tmp_time[0] = delta_t_app.load(); // application runtime including in-period overhead, not include summary overhead
 
 #if OVERHEAD == 1
-    tmp_time[2] = delta_t_io_overhead; // in-period overhead during applicaiton runtime
+    tmp_time[2] = delta_t_io_overhead.load(); // in-period overhead during applicaiton runtime
 #endif
 
     // tmp_time[1] = (MPI_Wtime() - t_0) - delta_t_app; // overhead after application finishes
-    tmp_time[1] = (MPI_Wtime() - t_summary) - delta_t_app; // summary overhead after application finishes
+    tmp_time[1] = (MPI_Wtime() - t_summary) - delta_t_app.load(); // summary overhead after application finishes
 
     if (rank == 0)
         time_array = (double *)malloc(sizeof(double) * n_time);
@@ -932,7 +938,10 @@ template <typename Tag>
 void IOtraceBase<Tag>::apply_file_specific_bw_impl(bool write, FDType fd, long long transact_size)
 {
     Overhead_Start(MPI_Wtime() - t_0);
-    auto path = file_tracker.get_fd_path(fd);
+    std::optional<PathID> path = std::nullopt;
+#if BW_LIMIT_GRANULARITY > 2
+    path = file_tracker.get_fd_path(fd);
+#endif
     bw_limit.limit_by_file(write, std::move(path), transact_size);
     Overhead_End();
 }
@@ -976,7 +985,7 @@ void IOtraceBase<Tag>::set_custom_throughput(void){
 }
 #endif
 
-#if BW_LIMIT_FTIO == 1
+#if BW_LIMIT_FREQ == 1
 template <typename Tag>
 void IOtraceBase<Tag>::set_bw_limit_freq(double frequency) {
     bw_limit.set_io_frequency(frequency);
@@ -991,4 +1000,6 @@ template class IOtraceBase<MPI_Tag>;
 template class IOtraceBase<Libc_Tag>;
 
 // Explicit instantiation for IOuring_Tag
+#if ENABLE_IOURING_TRACE == 1
 template class IOtraceBase<IOuring_Tag>;
+#endif

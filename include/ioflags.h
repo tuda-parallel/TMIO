@@ -62,7 +62,7 @@ constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFET
 #endif
 
 #ifndef BW_LIMIT_VERBOSE
-#define BW_LIMIT_VERBOSE 0 //controls debug of bw_limit in  bw_limit.cxx
+#define BW_LIMIT_VERBOSE 1 //controls debug of bw_limit in  bw_limit.cxx
 constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 #endif
 
@@ -97,7 +97,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 
 #ifndef SAME_T_END // same end time for phase in iodata.cxx
-#define SAME_T_END 1
+#define SAME_T_END 0
 #endif
 
 #ifndef SKIP_LAST_WRITE
@@ -222,34 +222,38 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 // Defines the Limiting strategy
 #ifndef BW_LIMIT_STRATEGY
-#define BW_LIMIT_STRATEGY 1 // 0: always (default) -- 1: increase only -- 2: limit the down side 
+#define BW_LIMIT_STRATEGY 0 // 0: always (default) -- 1: increase only -- 2: limit the down side 
 #endif
+
+#ifndef BW_LIMIT_FREQ
+#define BW_LIMIT_FREQ 1
+#endif
+
 // Tolerance value to scale the desired values
 #ifndef TOL
 #define TOL 1.1
 #endif
 
 #ifndef BW_LIMIT_GRANULARITY
-#define BW_LIMIT_GRANULARITY 1
+#define BW_LIMIT_GRANULARITY 3
 // 0 No Limit
 // 1 By phase
-// 2 By file
-// 3 By file - scaled by transaction size
-#endif
-
-// Use FTIO for phase length calculation
-#if FILE_FORMAT == 3 // ZMQ
-#define BW_LIMIT_FTIO 0
+// 2 By request size
+// 3 By prev file bw
+// 4 By prev file bw - scaled by transaction size
 #endif
 #endif
-
 
 #ifndef PREFETCH
 #define PREFETCH 0 // If set to 1, prefetch MPI calls
 
 #if FILE_FORMAT == 3
-#define PREFETCH_FREQ
+#define FETCH_FTIO_FREQ 0 // If set to 1, fetch frequency from FTIO
 #endif
+#endif
+
+#ifndef CONSIDER_PREV_N
+#define CONSIDER_PREV_N 2
 #endif
 
 //* Other Settings
