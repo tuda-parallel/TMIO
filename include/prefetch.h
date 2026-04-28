@@ -1,20 +1,19 @@
 #ifndef PREFETCH_H
 #define PREFETCH_H
 
-#include <mutex>
-#include <vector>
-#include <utility>
+#include <array>
+#include <condition_variable>
+#include <cstdarg>
+#include <ioflags.h>
+#include <map>
 #include <memory>
 #include <mpi.h>
-#include <map>
-#include <array>
-#include <ioflags.h>
-#include <cstdarg>
-#include <iodata.h>
+#include <mutex>
 #include <optional>
-#include <condition_variable>
-#include <iotrace.h>
 #include <unordered_map>
+#include <utility>
+#include <vector>
+#include "iotrace.h"
 
 
 struct CallSignature 
@@ -42,24 +41,23 @@ class RequestCache {
 public:
     struct Request {
         std::unique_ptr<MPI_Request> mpi_request;
-        std::vector<char> buffer;
+        std::unique_ptr<char[]> buffer;
         CallSignature cs;
         double last_access;
 
-        Request(size_t buffer_size, const CallSignature& cs, double last_access)
-         : cs(cs), last_access(last_access) {
-            buffer.resize(buffer_size);
+        Request(size_t buffer_size, const CallSignature& cs, double last_access) : 
+        buffer(std::unique_ptr<char[]>(new char[buffer_size])), cs(cs), last_access(last_access) {
             mpi_request = std::make_unique<MPI_Request>();
-         };
+        };
 
         int fill_buffer_with_request(void* target_buffer, MPI_Offset total_offset, int count, MPI_Status *status, size_t& missed_bytes);
     };
 private:
     std::mutex request_lock;
     std::map<MPI_File, std::vector<Request>> requests;
-    size_t total_cached_bytes;
     const size_t max_cache_size_bytes;
     const size_t max_file_size_bytes;
+    size_t total_cached_bytes;
 
     bool evict_request(size_t);
 public:
@@ -81,8 +79,8 @@ class Prefetcher
 private:
     struct CallInfo {
             double last_call_time;
-            std::array<MPI_Offset, 2> total_offset;
-            std::array<int, 2> count;
+            std::array<MPI_Offset, CONSIDER_PREV_N> total_offset;
+            std::array<int, CONSIDER_PREV_N> count;
             MPI_Datatype datatype;
             std::optional<double> next_prefetch_time;
             bool prefetched;
@@ -99,11 +97,15 @@ private:
                 prefetched(false) {};
 
             void add_offset(MPI_Offset o) {
-                total_offset[1] = total_offset[0];
+                for(int i = CONSIDER_PREV_N - 1; i > 0; ++i) {
+                    total_offset[i] = total_offset[i-1];
+                }
                 total_offset[0] = o;
             };
             void add_count(int c) {
-                count[1] = count[0];
+                for(int i = CONSIDER_PREV_N - 1; i > 0; ++i) {
+                    count[i] = count[i-1];
+                }
                 count[0] = c;
             };
     };
@@ -136,8 +138,9 @@ private:
         }
         
         void phase_end() {
-            if(!phase_added && current_call_idx == callInfos.size())
+            if(!phase_added && current_call_idx == callInfos.size()) {
                 valid_prefetch = true;
+}
             current_call_idx = 0;
             phase_added = false;
         }
@@ -208,7 +211,8 @@ private:
     void end_overhead() {
 #if OVERHEAD == 1
         double overhead = total_overhead.load();
-        while (!total_overhead.compare_exchange_weak(overhead, overhead + MPI_Wtime() - local_overhead));
+        while (!total_overhead.compare_exchange_weak(overhead, overhead + MPI_Wtime() - local_overhead)) {;
+}
 #endif
     }
 
@@ -216,10 +220,7 @@ private:
     void register_transaction(CallSignature &cs, double);
 
 public:
-    Prefetcher();
-    ~Prefetcher() {
-        if(inititalized) finalize();
-    }
+    Prefetcher() : inititalized(false) {};
     void init(double, size_t = 1'000'000'000, size_t = 100'000'000);
     void finalize();
     void close_file(MPI_File file);
@@ -252,5 +253,4 @@ private:
     static CallSignature determine_prefetch_signature(CallInfo&, MPI_File);
     static std::optional<double> calculate_next_prefetch(CallInfo&, double, double, std::optional<double>);
 };
-
 #endif
