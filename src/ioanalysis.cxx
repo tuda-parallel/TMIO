@@ -25,7 +25,7 @@ collect *ioanalysis::Gather_Collect(IOdata *iodata, int *n, int rank, int proces
 
 	iohf::Function_Debug(__PRETTY_FUNCTION__);
 	collect *all_data = NULL;
-	int m = 9;
+	constexpr int m = 9;
 	static int counter = 0;
 
 	static MPI_Datatype GATHER_collect;
