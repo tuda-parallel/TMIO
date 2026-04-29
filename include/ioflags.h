@@ -27,12 +27,6 @@
 #define DEBUG 0 // set debug level for tmio.cxx
 #endif
 
-#ifndef IODATA_VERBOSE
-#define IODATA_VERBOSE 0//set debug level for iodata.cxx
-#endif
-
-#ifndef IOTRACE_VERBOSE
-#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 enum class VerbosityLevel {
     NONE_LOG = 0,   // No logging
     BASIC_LOG = 1,  // Basic information
@@ -41,10 +35,6 @@ enum class VerbosityLevel {
     TRACE_LOG = 4   // Very verbose, trace-level information
 };
 
-#ifndef DEBUG 
-#define DEBUG 0 // set debug level for tmio.cxx
-#endif
-
 #ifndef IODATA_VERBOSE
 #define IODATA_VERBOSE 0//set debug level for iodata.cxx
 #endif
@@ -52,6 +42,14 @@ enum class VerbosityLevel {
 #ifndef IOTRACE_VERBOSE
 #define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
+#endif
+
+#ifndef DEBUG 
+#define DEBUG 0 // set debug level for tmio.cxx
+#endif
+
+#ifndef IODATA_VERBOSE
+#define IODATA_VERBOSE 0//set debug level for iodata.cxx
 #endif
 
 #ifndef PREFETCH_VERBOSE

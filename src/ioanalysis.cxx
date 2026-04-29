@@ -235,52 +235,52 @@ int *ioanalysis::Get_N_From_ALL_N(IOdata *iodata, n_struct *all_n, int rank, int
 		n = (int *)malloc(sizeof(int) * processes);
 		switch (iodata->get_transaction_type())
 		{
-		case IOdata::TransactionType::Async_Write: {
-			for (int i = 0; i < processes; i++)
-					n[i] = all_n[i].aw;
-			#if IOANALYSIS_VERBOSE >= 1
-			std::cout << "\t total aw = [";
-			for (int i = 0; i < processes; i++)
-				std::cout << all_n[i].aw << " ";
-			std::cout << "]" << std::endl;
-			#endif
-			break;
-		}
-		case IOdata::TransactionType::Async_Read: {
-			for (int i = 0; i < processes; i++)
-					n[i] = all_n[i].ar;
-			#if IOANALYSIS_VERBOSE >= 1
-			std::cout << "\t total ar = [";
-			for (int i = 0; i < processes; i++)
-				std::cout << all_n[i].ar << " ";
-			std::cout << "]" << std::endl;
-			#endif
-			break;
-		}
-		case IOdata::TransactionType::Sync_Write: {
-			for (int i = 0; i < processes; i++)
-					n[i] = all_n[i].sw;
-			#if IOANALYSIS_VERBOSE >= 1
-			std::cout << "\t total sw = [";
-			for (int i = 0; i < processes; i++)
-				std::cout << all_n[i].sw << " ";
-			std::cout << "]" << std::endl;
-			#endif
-			break;
-		}
-		case IOdata::TransactionType::Sync_Read: {
-			for (int i = 0; i < processes; i++)
-					n[i] = all_n[i].sr;
-			#if IOANALYSIS_VERBOSE >= 1
-			std::cout << "\t total sr = [";
-			for (int i = 0; i < processes; i++)
-				std::cout << all_n[i].sr << " ";
-			std::cout << "]" << std::endl;
-			#endif
-			break;
+			case IOdata::TransactionType::Async_Write: {
+				for (int i = 0; i < processes; i++)
+						n[i] = all_n[i].aw;
+				#if IOANALYSIS_VERBOSE >= 1
+				std::cout << "\t total aw = [";
+				for (int i = 0; i < processes; i++)
+					std::cout << all_n[i].aw << " ";
+				std::cout << "]" << std::endl;
+				#endif
+				break;
+			}
+			case IOdata::TransactionType::Async_Read: {
+				for (int i = 0; i < processes; i++)
+						n[i] = all_n[i].ar;
+				#if IOANALYSIS_VERBOSE >= 1
+				std::cout << "\t total ar = [";
+				for (int i = 0; i < processes; i++)
+					std::cout << all_n[i].ar << " ";
+				std::cout << "]" << std::endl;
+				#endif
+				break;
+			}
+			case IOdata::TransactionType::Sync_Write: {
+				for (int i = 0; i < processes; i++)
+						n[i] = all_n[i].sw;
+				#if IOANALYSIS_VERBOSE >= 1
+				std::cout << "\t total sw = [";
+				for (int i = 0; i < processes; i++)
+					std::cout << all_n[i].sw << " ";
+				std::cout << "]" << std::endl;
+				#endif
+				break;
+			}
+			case IOdata::TransactionType::Sync_Read: {
+				for (int i = 0; i < processes; i++)
+						n[i] = all_n[i].sr;
+				#if IOANALYSIS_VERBOSE >= 1
+				std::cout << "\t total sr = [";
+				for (int i = 0; i < processes; i++)
+					std::cout << all_n[i].sr << " ";
+				std::cout << "]" << std::endl;
+				#endif
+				break;
+			}
 		}
 	}
-
 	return n;
 }
 //**********************************************************************

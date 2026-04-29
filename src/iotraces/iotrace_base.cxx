@@ -298,10 +298,10 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
         async_write_size.push_back(size);
 
         // phase start if first request. Add phase data and offset
-        p_aw->Phase_Start(async_write_request.empty(), async_write_time.back(), async_write_size.back(), offset, path);
+        p_aw->Phase_Start(async_write_requests.empty(), async_write_time.back(), async_write_size.back(), offset, path);
 
         // save request flag and set request counter (required and actual to one)
-        async_write_request.push_back(requestID);
+        async_write_requests.emplace_back(requestID);
         async_write_queue_req.push_back(1);
         async_write_queue_act.push_back(1);
     }
@@ -345,7 +345,7 @@ void IOtraceBase<Tag>::Write_Async_End_Impl(RequestIDType request, int write_sta
                 std::shared_lock lock(async_write_vecs_lock);                                                                
                 IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
                     "%s > rank %i %s>> Async ended (act ended). Active async write requests %li/%li %s\n", 
-                    caller, rank, GREEN, async_write_request.size(), counter++, BLACK); });
+                    caller, rank, GREEN, async_write_requests.size(), counter++, BLACK); });
         }
     }
 
@@ -409,10 +409,10 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
         // determnine read size
         async_read_size.push_back(size);
         
-        p_ar->Phase_Start(async_read_request.empty(), async_read_time.back(), async_read_size.back(), offset, path);
+        p_ar->Phase_Start(async_read_requests.empty(), async_read_time.back(), async_read_size.back(), offset, path);
 
         // save request flag and set request counter (required and actual to one)
-        async_read_request.push_back(requestID);
+        async_read_requests.emplace_back(requestID);
         async_read_queue_req.push_back(1);
         async_read_queue_act.push_back(1);
     }
@@ -449,7 +449,7 @@ void IOtraceBase<Tag>::Read_Async_End_Impl(RequestIDType request, int read_statu
             // add values to traced data and add phase values if condition is true
             // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, (async_read_requests.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
             // Act_Done: if empty request reutrns 1 (act finished after wait) and if all request are done (= 0, act finished before wait) returns true
-            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0,(async_read_request.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
+            // p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0,(async_read_requests.empty() || (async_read_queue_act.size() == 1 && async_read_queue_act.back() == 0)));
             p_ar->Phase_End_Act(size_async_read, t_async_read_start, MPI_Wtime() - t_0, Act_Done(1));
             // std::cout << "Act_Done return" << Act_Done(1) << std::endl;
 
@@ -502,7 +502,7 @@ void IOtraceBase<Tag>::Read_Async_Required_Impl(RequestIDType request)
                                                                       {
             std::lock_guard lock(async_read_vecs_lock);                                                            
             IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
-                "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_request.size(), BLACK);});
+                "%s > rank %i %s>> active read async requests %li %s\n", caller, rank, GREEN, async_read_requests.size(), BLACK);});
     
 #if IOTRACE_VERBOSE >= 2
 	static long int counter = 1;
@@ -682,7 +682,7 @@ bool IOtraceBase<Tag>::
     Check_Request_Write(RequestIDType request, double *start_time, long long *size, int mode)
 {
     std::lock_guard lock(async_write_vecs_lock);
-    if (!async_write_request.empty())
+    if (!async_write_requests.empty())
     {
         for (unsigned int i = 0; i < async_write_requests.size(); i++)
         {
@@ -745,7 +745,7 @@ bool IOtraceBase<Tag>::Check_Request_Read(RequestIDType request, double *start_t
 {
     std::lock_guard lock(async_read_vecs_lock);
 
-    if (!async_read_request.empty())
+    if (!async_read_requests.empty())
     {
         for (unsigned int i = 0; i < async_read_requests.size(); i++)
         {
