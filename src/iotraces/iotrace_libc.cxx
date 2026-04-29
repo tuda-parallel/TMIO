@@ -1,4 +1,6 @@
 #include "iotrace.h"
+
+#if ENABLE_LIBC_TRACE == 1
 #include <aio.h>
 #include <atomic>
 
@@ -48,7 +50,7 @@ void IOtraceLibc::Write_Async_Start(const struct aiocb *aiocbp)
             "%s > rank %i > #%li will asnyc write %i x %i = %lli bytes \n",
                 caller, rank, counter++, 1, total_size, total_size); });
 
-    Write_Async_Start_Impl(aiocbp, total_size, aiocbp->aio_offset, start_time);
+    Write_Async_Start_Impl(const_cast<struct aiocb *>(aiocbp), total_size, aiocbp->aio_offset, start_time);
 }
 
 void IOtraceLibc::Write_Async_Start(const struct aiocb64 *aiocbp)
@@ -74,7 +76,7 @@ void IOtraceLibc::Write_Async_End(const struct aiocb *aiocbp, int write_status)
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    Write_Async_End_Impl(aiocbp, write_status);
+    Write_Async_End_Impl(const_cast<struct aiocb *>(aiocbp), write_status);
 }
 
 void IOtraceLibc::Write_Async_End(const struct aiocb64 *aiocbp, int write_status)
@@ -99,7 +101,7 @@ void IOtraceLibc::Write_Async_Required(const struct aiocb *aiocbp)
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    Write_Async_Required_Impl(aiocbp);
+    Write_Async_Required_Impl(const_cast<struct aiocb *>(aiocbp));
 }
 
 void IOtraceLibc::Write_Async_Required(const struct aiocb64 *aiocbp)
@@ -135,7 +137,7 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb *aiocbp)
             "%s > rank %i > #%li will async read %lli bytes\n",
             caller, rank, counter++, total_size); });
 
-    Read_Async_Start_Impl(aiocbp, total_size, aiocbp->aio_offset, start_time);
+    Read_Async_Start_Impl(const_cast<struct aiocb *>(aiocbp), total_size, aiocbp->aio_offset, start_time);
 }
 
 void IOtraceLibc::Read_Async_Start(const struct aiocb64 *aiocbp)
@@ -161,7 +163,7 @@ void IOtraceLibc::Read_Async_End(const struct aiocb *aiocbp, int read_status)
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    Read_Async_End_Impl(aiocbp, read_status);
+    Read_Async_End_Impl(const_cast<struct aiocb *>(aiocbp), read_status);
 }
 
 void IOtraceLibc::Read_Async_End(const struct aiocb64 *aiocbp, int read_status)
@@ -186,7 +188,7 @@ void IOtraceLibc::Read_Async_Required(const struct aiocb *aiocbp)
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    Read_Async_Required_Impl(aiocbp);
+    Read_Async_Required_Impl(const_cast<struct aiocb *>(aiocbp));
 }
 void IOtraceLibc::Read_Async_Required(const struct aiocb64 *aiocbp)
 {
@@ -408,3 +410,4 @@ void IOtraceLibc::Batch_Read_Sync_End()
         "%s > rank %i %s>>> batch reading end time %f %s\n", caller, rank, YELLOW, t_sync_read_end, BLACK);
     Overhead_End();
 }
+#endif // ENABLE_LIBC_TRACE

@@ -122,7 +122,7 @@ public:
     bool get_prev_phase_file_stats(const PathID&, long long&, double&);
 #endif
     
-    //? calucalte the Bandwidth after the application finishes
+    //? calculate the Bandwidth after the application finishes
     void Bandwidth_In_Phase_Offline(void);
 
 private: 

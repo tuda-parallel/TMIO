@@ -299,7 +299,7 @@ void statistics::Overlap(std::vector<std::vector<int>> &phase_overlap, std::vect
 #if HDEBUG >= 1
 			std::cout << "phase " << id_e[k_e] << " -> end" << std::endl;
 			std::cout << "stack: ";
-			for (int i = 0; i < stack.size(); i++)
+			for (unsigned int i = 0; i < stack.size(); i++)
 				std::cout << " " << stack[i] << " ";
 			std::cout << std::endl;
 #endif
@@ -318,7 +318,7 @@ void statistics::Overlap(std::vector<std::vector<int>> &phase_overlap, std::vect
 #if HDEBUG >= 1
 			std::cout << "phase " << id_s[k_s] << " -> start" << std::endl;
 			std::cout << "stack: ";
-			for (int i = 0; i < stack.size(); i++)
+			for (unsigned int i = 0; i < stack.size(); i++)
 				std::cout << " " << stack[i] << " ";
 			std::cout << std::endl;
 #endif
@@ -464,10 +464,7 @@ void statistics::Gather_Ind_Bandwidth(int rank, int procs, std::vector<double> t
 				counter++;
 			}
 		}
-	}
 
-	if (rank == 0)
-	{
 		all_t = (double *)malloc(sizeof(double) * agg_ops);
 		all_t_act_s = (double *)malloc(sizeof(double) * agg_ops);
 		all_t_act_e = (double *)malloc(sizeof(double) * agg_ops);

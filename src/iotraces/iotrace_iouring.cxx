@@ -1,11 +1,10 @@
+#include "iotrace.h"
 #if ENABLE_IOURING_TRACE == 1
-
 #include <liburing.h>
 #include <sys/uio.h> // For struct iovec
 #include <stdexcept> // For std::runtime_error
 #include <string>    // For std::to_string
 #include <cstdlib>   // For abort()
-#include "iotrace.h"
 
 namespace
 {
@@ -69,8 +68,9 @@ namespace
 // ===================================================================================
 
 IOtraceIOuring::IOtraceIOuring()
-    : keep_polling_(true),
-      staged_requests_queue_(1024) // Size must be a power of two
+    : staged_requests_queue_(1024), // Size must be a power of two
+    keep_polling_(true)
+      
 {
     polling_thread_ = std::thread(&IOtraceIOuring::polling_loop, this);
 }
@@ -398,4 +398,4 @@ void IOtraceIOuring::Read_Async_Required(RequestIDType requestID)
 {
     Read_Async_Required_Impl(requestID);
 }
-#endif
+#endif // ENABLE_IOURING_TRACE

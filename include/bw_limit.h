@@ -1,6 +1,7 @@
 #ifndef BW_LIMIT_H
 #define BW_LIMIT_H
 
+#include "convergence.h"
 #include "iodata.h"
 #include "ioflags.h"
 #include <cstdarg>
@@ -46,6 +47,19 @@ private:
 
 	double bw_limit_iwrite;
 	double bw_limit_iread;
+
+	dc_context_t context_read;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_write;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_iread;	 // structure used by the bandwidth limitation approach in the custom mpich
+	dc_context_t context_iwrite; // structure used by the bandwidth limitation approach in the custom mpich
+
+	int first_time_read;   // used to indicate the first time assignment of the bandwidth for sync write operations
+	int first_time_write;  // used to indicate the first time assignment of the bandwidth for sync read operations
+	int first_time_iread;  // used to indicate the first time assignment of the bandwidth for  async write operations
+	int first_time_iwrite; // used to indicate the first time assignment of the bandwidth for  async read operations
+
+	double Biw;
+	double Bir;
 	double Bw;
 	double Br;
 

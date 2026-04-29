@@ -56,19 +56,23 @@ The obtained traces can be analyzed as explained here [exploring the traces](#ex
   </ol>
 </details>
 
-see latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tree/main/ChangeLog.md)
+See latest updates here: [Latest News](https://github.com/tuda-parallel/TMIO/tree/main/ChangeLog.md)
 
 ## Getting Started
 ### Prerequisites
 - MPI
-- MsgPack (installed automatically see [Installation](#installation))
+- MsgPack (installed automatically, see [Installation](#installation))
 
 <p align="right"><a href="#tmio">⬆</a></p>
 
 ### Installation
+First clone the github repo:
+```sh
+git clone https://github.com/tuda-parallel/TMIO.git
+```
 Go to the build directory:
 ```sh
-cd build
+cd TMIO/build
 ```
 Build the library using the Makefile.
 The library can be built with or without MessagePack:
@@ -219,6 +223,38 @@ Authors:
 
 
 
+## Limitations:  MPI Request Handling
+
+This implementation compares `MPI_Request` objects to manage asynchronous I/O operations.  **It is critical that the *same* `MPI_Request` object is used consistently**—from the asynchronous write call to the corresponding `MPI_Wait`.
+
+Why This Matters:
+- After a call to `MPI_Wait`, MPI sets the corresponding request to `MPI_REQUEST_NULL`.
+- `MPI_Request` objects cannot be reliably compared by value—MPI manages them internally.
+- Therefore, it's essential to operate on the **same memory location**, not just a copy of the request.
+
+####
+
+```cpp
+// ✅ Correct Usage
+// Store and pass the request using the same memory reference:
+MPI_Request req;
+some_array->request_arr[i] = req;
+MPI_File_iwrite_at(..., &some_array->request_arr[i]);
+// Here, the request used in MPI_File_iwrite_at is the 
+// same object stored for later use (e.g., in MPI_Wait).
+
+// ❌ Incorrect Usage
+// Avoid passing a separate copy of the request:
+MPI_Request req;
+some_array->request_arr[i] = req;
+MPI_File_iwrite_at(..., &req); // Different address from the one stored
+```
+
+# List Of Contributors
+
+We sincerely thank the following contributors for their valuable contributions:
+- [Ahmad Tarraf](https://github.com/a-tarraf)
+- [Qi Chen](https://github.com/qbacpey): POSIX and IO_Uring tracing support
 
 
 [pipeline.badge]: https://git.rwth-aachen.de/parallel/tmio/badges/main/pipeline.svg

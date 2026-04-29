@@ -75,4 +75,4 @@ else
 	echo -e "${RED}No target specified${BLACK}"
 fi
 
-echo -e "${GREEN}    -------------- Read to go ----------------\n ${BLACK}"
+echo -e "${GREEN}    -------------- Ready to go ----------------\n ${BLACK}"

@@ -19,16 +19,3 @@ make test
 ./run_test_mpi
 ./run_test_libc
 ```
-
-### Add new test cases
-
-If only need to add new test cases for the existing test folder, just add the new test file in the corresponding folder. Not need to modify the `Makefile` or other files.
-
-But if need to add new folder for testing, remember to add:
-
-```cpp
-#define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
-```
-
-in the new test file. And modify the `Makefile` to add the new test file target.
-

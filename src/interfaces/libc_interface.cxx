@@ -1,13 +1,17 @@
 #include "tmio.h"
+
+#if ENABLE_LIBC_TRACE == 1
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <time.h>
-#include <aio.h>
+#include <liburing.h>
 
 #ifdef __linux__
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE // For preadv2, must be defined before including any headers
+#endif
 #include <sys/uio.h>
 #endif
 
@@ -21,7 +25,7 @@
 #define HAVE_PREADV2
 #endif
 
-#if ENABLE_LIBC_TRACE == 1
+
 IOtraceLibc& get_libc_iotrace() {
 	// Must use static IOtraceLibc instance to ensure a single instance is initialized when first used.
 	// TODO: Might need to use a mutex to protect the instance creation if multiple threads might access it simultaneously.

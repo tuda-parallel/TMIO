@@ -1,11 +1,11 @@
 #include "tmio.h"
+
+#if ENABLE_IOURING_TRACE == 1
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <time.h>
-
-#if ENABLE_IOURING_TRACE == 1
 #include <liburing.h>
 
 IOtraceIOuring &get_iouring_iotrace()
