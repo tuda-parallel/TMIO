@@ -46,5 +46,8 @@ Flags for specialized use cases (Bandwidth Limiting, DFT, etc.).
 | :--- | :---: | :--- |
 | `BW_LIMIT` | *Undef* | If defined, enables Bandwidth Limiting (requires custom MPI). |
 | `BW_LIMIT_STRATEGY`| `2` | `0`: Always limit. `1`: Increase only. `2`: Limit downside. |
+| `BW_LIMIT_GRANULARITY`| `1` | `0`: Deactivate limit. `1`: Phase based limit. `2`: Request based limit. `3`: File based limit. `4`: File based limit with scaling. |
+| `BW_LIMIT_FREQ` | `0` | `0`: Off. `1`: Utilize frequency information for prefetching. |
+| `PREFETCH` | *Undef* | If defined, enables prefetching for MPI file read requests. |
 | `DFT` | `0` | **Discrete Fourier Transform.** (Deprecated) Performs frequency analysis on I/O phases. |
 | `DFT_TIME_WINDOW` | `1` | `0`: Standard window. `1`: Adaptive window based on frequency. |
