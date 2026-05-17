@@ -222,7 +222,7 @@ void IOdata::Phase_End_Req(long long b, double ts, double te, [[maybe_unused]] c
 
 //Sum: aggregegated bandwidth of individual I/O opertaions
 #if ONLINE == 1 
-    phase_data.back().B_sum  += bandwidth_req.back();    
+    phase_data.back().B_sum  += bandwidth_req.back();
 
 #if IODATA_VERBOSE >= 3
     static int counter = 0; 

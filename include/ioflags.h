@@ -41,8 +41,8 @@ enum class VerbosityLevel {
 
 #ifndef IOTRACE_VERBOSE
 #define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
-constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 #endif
+constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
 
 #ifndef DEBUG 
 #define DEBUG 0 // set debug level for tmio.cxx
@@ -53,9 +53,9 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef PREFETCH_VERBOSE
-#define PREFETCH_VERBOSE 0 //set debug level for iodata.cxx
-constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFETCH_VERBOSE);
+#define PREFETCH_VERBOSE 0 //set debug level for prefetch.cxx
 #endif
+constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFETCH_VERBOSE);
 
 #ifndef IOANALYSIS_VERBOSE
 #define IOANALYSIS_VERBOSE 0 //set debug level for ioanalysis.cxx
@@ -70,9 +70,9 @@ constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFET
 #endif
 
 #ifndef BW_LIMIT_VERBOSE
-#define BW_LIMIT_VERBOSE 1 //controls debug of bw_limit in  bw_limit.cxx
-constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
+#define BW_LIMIT_VERBOSE 0 //controls debug of bw_limit in  bw_limit.cxx
 #endif
+constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 
 // #define TIME_VERBOSE  //Trace time of rank 0 
 
@@ -234,7 +234,7 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 
 #ifndef BW_LIMIT_FREQ
-#define BW_LIMIT_FREQ 1
+#define BW_LIMIT_FREQ 0
 #endif
 
 // Tolerance value to scale the desired values
@@ -242,8 +242,9 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #define TOL 1.1
 #endif
 
+// Defines bandwidth limiting granularity
 #ifndef BW_LIMIT_GRANULARITY
-#define BW_LIMIT_GRANULARITY 3
+#define BW_LIMIT_GRANULARITY 1
 // 0 No Limit
 // 1 By phase
 // 2 By request size
@@ -252,16 +253,16 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 #endif
 #endif
 
-#ifndef PREFETCH
-#define PREFETCH 0 // If set to 1, prefetch MPI calls
-
+#ifdef PREFETCH
 #if FILE_FORMAT == 3
+#ifndef FETCH_FTIO_FREQ
 #define FETCH_FTIO_FREQ 0 // If set to 1, fetch frequency from FTIO
 #endif
 #endif
 
 #ifndef CONSIDER_PREV_N
 #define CONSIDER_PREV_N 2
+#endif
 #endif
 
 //* Other Settings

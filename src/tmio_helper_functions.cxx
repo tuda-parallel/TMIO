@@ -250,15 +250,15 @@ void retrieve_FTIO_frequency(double& dominant_frequency, double& confidence) {
     int rank;
     MPI_Comm IO_WORLD;
     double values[2] = {-1.0, -1.0};
-    MPI_Comm_dup(MPI_COMM_WORLD, &IO_WORLD);
-    MPI_Comm_set_errhandler(IO_WORLD, MPI_ERRORS_RETURN);
 
-    MPI_Comm_rank(IO_WORLD, &rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	if (rank == 0) {
+    int root = 0;
+
+	if (rank == root) {
 		zmq::context_t context(1);
 		zmq::socket_t receiver(context, ZMQ_PULL);
-		receiver.connect("tcp://127.0.0.1:5556");
+		receiver.bind("tcp://127.0.0.1:5556");
 		
 		zmq::message_t msg;
 		auto res = receiver.recv(msg, zmq::recv_flags::dontwait);
@@ -271,11 +271,11 @@ void retrieve_FTIO_frequency(double& dominant_frequency, double& confidence) {
         }
 	}
 
-	int root = 0;
+	MPI_Bcast(values, 2, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
-	MPI_Bcast(&dominant_frequency, 1, MPI_DOUBLE, 0, IO_WORLD);
-
-    dominant_frequency = values[0];
-    confidence = values[1];
+    if (values[0] >= 0.0) {
+        dominant_frequency = values[0];
+        confidence = values[1];
+    }
 }
 #endif

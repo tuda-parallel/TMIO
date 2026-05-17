@@ -69,6 +69,7 @@ public:
 	void apply_file_specific_bw_impl(bool, FDType, long long);
 #endif
 	void apply_checkpoint_limit_impl(long long, double);
+	void apply_prefetch_limit_impl(long long, double);
 #if BW_LIMIT_GRANULARITY == 1
 	void apply_bw_limit(void);
 #endif

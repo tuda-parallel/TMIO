@@ -12,7 +12,7 @@ extern "C"
 		// Get results from last summary call
 		double frequency, confidence;
 		retrieve_FTIO_frequency(frequency, confidence);
-#if PREFETCH == 1
+#ifdef PREFETCH
 		prefetcher.set_io_frequency(frequency);
 #endif
 #if BW_LIMIT_FREQ == 1
@@ -30,7 +30,7 @@ extern "C"
 #endif
 	}
 	void init_prefetcher(double io_frequency, size_t max_cache_bytes, size_t max_file_bytes) {
-#if PREFETCH == 1 & ENABLE_MPI_TRACE == 1
+#if defined PREFETCH && ENABLE_MPI_TRACE == 1
 		prefetcher.init(io_frequency, max_cache_bytes, max_file_bytes);
 #endif
 	}
@@ -47,7 +47,7 @@ extern "C"
 	}
 
     void set_io_freqency(double frequency) {
-#if PREFETCH == 1 & ENABLE_MPI_TRACE == 1
+#if defined PREFETCH && ENABLE_MPI_TRACE == 1
 		prefetcher.set_io_frequency(frequency);
 #endif
 #if BW_LIMIT_FREQ == 1
@@ -60,7 +60,7 @@ extern "C"
 		// Get results from last summary call
 		double frequency, confidence;
 		retrieve_FTIO_frequency(frequency, confidence);
-#if PREFETCH == 1
+#ifdef PREFETCH
 		prefetcher.set_io_frequency(frequency);
 #endif
 #if BW_LIMIT_FREQ == 1

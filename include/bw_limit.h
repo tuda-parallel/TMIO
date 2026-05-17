@@ -110,6 +110,7 @@ public:
 #endif
 #ifdef BW_LIMIT
 	void limit_checkpoint(long long transaction_size, double end_time);
+	void limit_prefetch(long long transaction_size, double end_time);
 #endif
 #if BW_LIMIT_FREQ == 1
 	void set_io_frequency(double);

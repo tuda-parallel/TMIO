@@ -1,6 +1,6 @@
 #ifndef PREFETCH_H
 #define PREFETCH_H
-
+#if defined PREFETCH
 #include <array>
 #include <condition_variable>
 #include <cstdarg>
@@ -15,7 +15,7 @@
 #include <vector>
 #include "iotrace.h"
 
-
+// Collected information about a call
 struct CallSignature 
 {
     enum class CallType{
@@ -37,6 +37,7 @@ struct CallSignature
             fh(fh), count(count), type(type), offset(offset), ct(ct) {};
 };
 
+// Cache containing pending prefetched requests
 class RequestCache {
 public:
     struct Request {
@@ -54,7 +55,7 @@ public:
     };
 private:
     std::mutex request_lock;
-    std::map<MPI_File, std::vector<Request>> requests;
+    std::unordered_map<MPI_File, std::vector<Request>> requests;
     const size_t max_cache_size_bytes;
     const size_t max_file_size_bytes;
     size_t total_cached_bytes;
@@ -66,6 +67,7 @@ public:
         max_cache_size_bytes(max_cache_size), max_file_size_bytes(max_file_size), total_cached_bytes(0) {};
     size_t max_cache_bytes() const {return max_cache_size_bytes;};
     void remove_file(MPI_File&);
+    void remove_all();
     std::optional<Request> take_prefetched_by_call_signature(CallSignature&);
     void insert_request(MPI_File, Request);
     bool reserve_cache_space(size_t);
@@ -96,20 +98,29 @@ private:
                 next_prefetch_time(std::nullopt),
                 prefetched(false) {};
 
+            /**
+             * @brief Adds offset to pattern
+             * @param c Offset added to pattern
+             */
             void add_offset(MPI_Offset o) {
-                for(int i = CONSIDER_PREV_N - 1; i > 0; ++i) {
+                for(int i = CONSIDER_PREV_N - 1; i > 0; --i) {
                     total_offset[i] = total_offset[i-1];
                 }
                 total_offset[0] = o;
             };
+            /**
+             * @brief Adds count to pattern
+             * @param c Count added to pattern
+             */
             void add_count(int c) {
-                for(int i = CONSIDER_PREV_N - 1; i > 0; ++i) {
+                for(int i = CONSIDER_PREV_N - 1; i > 0; --i) {
                     count[i] = count[i-1];
                 }
                 count[0] = c;
             };
     };
 
+    // Contains information about call patterns
     struct PrefetchInfo
     {
         std::vector<CallInfo> callInfos;
@@ -119,15 +130,20 @@ private:
         bool phase_added;
 
         PrefetchInfo() : current_call_idx(0), prefetch_idx(0), valid_prefetch(false), phase_added(true) {};
+
+        /**
+         * @brief Add or update call information into call pattern
+         */
         void add_callInfo(double last_call_time, 
             MPI_Offset total_offset, 
             int count, 
             MPI_Datatype datatype) {
+            // New tracked call or change in pattern
             if(current_call_idx >= callInfos.size()) {
                 callInfos.emplace_back(CallInfo(last_call_time, total_offset, count, datatype));  
                 valid_prefetch = false;
                 phase_added = true;
-            } else {
+            } else { // Update pattern by adding offset and count
                 auto& ci = callInfos[current_call_idx];
                 ci.add_offset(total_offset);
                 ci.last_call_time = last_call_time;
@@ -137,18 +153,29 @@ private:
             ++current_call_idx;
         }
         
+        /**
+         * @brief Check if patterns are ready for prefetch in next I/O interval
+         */
         void phase_end() {
+            // Check if pattern consistent across phases
             if(!phase_added && current_call_idx == callInfos.size()) {
                 valid_prefetch = true;
-}
+            }
             current_call_idx = 0;
             phase_added = false;
         }
 
+        /**
+         * @brief Get information about next call in pattern
+         * @return Information about call
+         */
         CallInfo& get_next_prefetch() {
             return callInfos.at(prefetch_idx);
         }
 
+        /**
+         * @brief Advance prefetch pattern
+         */
         void advance_prefetch() {
             callInfos.at(prefetch_idx).prefetched = true;
             callInfos.at(prefetch_idx).next_prefetch_time = std::nullopt;
@@ -156,6 +183,7 @@ private:
         }
     };
 
+    // Shared datastructure containing pattern data
     struct CallDB
     {
         std::mutex event_mutex; // deadlock prevention: lock call_lock first!
@@ -171,6 +199,7 @@ private:
         CallDB(double frequency) : io_interval(1/frequency), prefetch_ratio(0.8) {};
     };
 
+    // Structure to reserve datafor asynchronous calls
     struct AsyncBuffers {
         RequestCache::Request prefetch_request;
         void* target_buffer;
@@ -179,6 +208,9 @@ private:
 
         AsyncBuffers(RequestCache::Request&& pr, void* tb, int c, MPI_Offset to) : prefetch_request(std::move(pr)), target_buffer(tb), total_offset(to), count(c) {};
     };
+
+    int rank;
+    int processes;
 
     bool inititalized = false;
     std::thread prefetching_thread;
@@ -189,10 +221,10 @@ private:
     std::shared_ptr<RequestCache> requests_in_transit;
 
     std::mutex ar_lock;
-    std::map<MPI_Request*, AsyncBuffers> async_requests;
+    std::unordered_map<MPI_Request*, AsyncBuffers> async_requests;
 
     std::mutex rs_lock;
-    std::map<MPI_Request*, CallSignature> request_signature;
+    std::unordered_map<MPI_Request*, CallSignature> request_signature;
 
     double phase_start;
 #if OVERHEAD == 1
@@ -203,16 +235,23 @@ private:
     std::atomic<double> total_overhead;
 #endif
 
+    /**
+     * @brief Start time overhead tracking
+     */
     void start_overhead() {
 #if OVERHEAD == 1
         local_overhead = MPI_Wtime();
 #endif
     };
+
+    /**
+     * @brief End overhead tracking
+     */
     void end_overhead() {
 #if OVERHEAD == 1
         double overhead = total_overhead.load();
         while (!total_overhead.compare_exchange_weak(overhead, overhead + MPI_Wtime() - local_overhead)) {;
-}
+        }
 #endif
     }
 
@@ -248,9 +287,10 @@ private:
     MPI_Request* determine_valid_request(MPI_Request* request);
     static bool is_contiguous_type(MPI_Datatype);
     static void prefetching_routine(std::shared_ptr<RequestCache>, std::shared_ptr<CallDB>, std::atomic<bool>&);
-    static void prefetch_transaction(CallSignature&, std::shared_ptr<RequestCache>&);
+    static void prefetch_transaction(CallSignature&, std::shared_ptr<RequestCache>&, double);
     static std::optional<MPI_File> determine_next_prefetch(std::shared_ptr<CallDB>&, double&);
     static CallSignature determine_prefetch_signature(CallInfo&, MPI_File);
     static std::optional<double> calculate_next_prefetch(CallInfo&, double, double, std::optional<double>);
 };
+#endif
 #endif

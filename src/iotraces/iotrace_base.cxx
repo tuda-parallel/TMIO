@@ -990,6 +990,16 @@ void IOtraceBase<Tag>::apply_checkpoint_limit_impl(long long transaction_size, d
     Overhead_End();
 }
 
+template <typename Tag>
+void IOtraceBase<Tag>::apply_prefetch_limit_impl(long long transaction_size, double duration_sec)
+{
+    Overhead_Start(MPI_Wtime() - t_0);
+#ifdef BW_LIMIT
+    bw_limit.limit_prefetch(transaction_size, duration_sec);
+#endif
+    Overhead_End();
+}
+
 //! ---------------------- Bw limit with Custom MPI implementaiton -------------------
 //************************************************************************************
 //*                               apply_bw_limit

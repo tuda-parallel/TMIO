@@ -45,8 +45,7 @@ Bw_limit::~Bw_limit()
  * captured through the custome_MPI implementation). If the throughout
  * is captured through the custome_MPI implementation, but the Bandwidth limiting strategy is off,
  * this info is displayed.
- * @param void
- * @return void
+ * @return Info string
  */
 std::string Bw_limit::Info(void) const
 {
@@ -73,8 +72,6 @@ std::string Bw_limit::Info(void) const
 /**
  * @brief Resets the variables that count how many operations of a specific type (async/sync read/write) have
  * occured so far. This information is avialble for every rank.
- * @param void
- * @return void
  */
 void Bw_limit::Reset(void)
 {
@@ -88,12 +85,10 @@ void Bw_limit::Reset(void)
 //*                               1. get_last_phase_info
 //************************************************************************************
 /**
- * @brief returns the I/O traces to extern libaries.
- *
- * @param mode either "aw", "sw", "ar" or "sr"
- * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
- * @param finished true if data from finished phase is requested
- * @return double
+ * @brief Get phase info from current or most recent phase
+ * @param mode [in] Type of traces to fetch
+ * @param info [in] info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
+ * @return Requested phase info
  */
 std::optional<double> Bw_limit::get_last_phase_info(TransactionType mode, std::string info) const
 {
@@ -120,11 +115,11 @@ std::optional<double> Bw_limit::get_last_phase_info(TransactionType mode, std::s
 //*                               2. set_phase_info
 //************************************************************************************
 /**
- * @brief assigns the I/O traces by extern libaries.
+ * @brief Assign phase info for current or most recent phase
  *
- * @param mode either "aw", "sw", "ar" or "sr"
- * @param info info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
- * @param value value assigned to the variable
+ * @param mode [in] Type of traces to modify
+ * @param info [in] Info needs to be in the form of iocollect: "t_start", "t_end_act", "t_end_req", "T_sum", "T_avr", "B_sum", "B_avr"
+ * @param value [in] Value assigned to the variable
  */
 void Bw_limit::set_phase_info(TransactionType mode, std::string info, double value)
 {
@@ -149,8 +144,13 @@ void Bw_limit::set_phase_info(TransactionType mode, std::string info, double val
 //*                               1. Init
 //************************************************************************************
 /**
- * @brief Assigns all externs variables
- *
+ * @brief Setup bw limit
+ * @param rank [in] Current MPI rank
+ * @param processes [in] Total mpi ranks
+ * @param p_aw [in] Pointer to async write trace data
+ * @param p_ar [in] Pointer to async read trace data
+ * @param p_sw [in] Pointer to sync write trace data
+ * @param p_sr [in] Pointer to sync read trace data
  */
 void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata *p_sw, IOdata *p_sr)
 {
@@ -207,7 +207,12 @@ void Bw_limit::Init(int rank, int processes, IOdata *p_aw, IOdata *p_ar, IOdata 
 }
 
 #if BW_LIMIT_GRANULARITY > 1
-
+/**
+ * @brief Update bandwidth limit on file basis
+ * @param write [in] Is file access a write access
+ * @param path [in, optional] Path associated with file
+ * @param transaction_size [in, optional] Number of transmitted bytes
+ */
 void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<PathID> path, [[maybe_unused]] long long transaction_size)
 {
 	std::lock_guard lock(bw_lock);
@@ -237,8 +242,18 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<Pa
 
 	#if BW_LIMIT_GRANULARITY == 2
 		auto phase_duration = p_data->get_last_phase_duration();
+	#if BW_LIMIT_FREQ == 1
+		if(ftio_phase_pred < 0.0) {
+			if(!phase_duration.has_value()) return;
+			file_measured_bw = transaction_size / phase_duration.value();
+		} else {
+			Bw_limit::Log<VerbosityLevel::DETAILED_LOG>("Utilizing phase infromation for bandwidth\n");
+			file_measured_bw = transaction_size / ftio_phase_pred; 
+		}
+	#else
 		if(!phase_duration.has_value()) return;
-		file_measured_bw = transaction_size / phase_duration.value();
+			file_measured_bw = transaction_size / phase_duration.value();
+	#endif
 	#endif
 
 	#if BW_LIMIT_GRANULARITY > 2
@@ -256,6 +271,7 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<Pa
 			if(!phase_duration.has_value()) return;
 			file_measured_bw = transaction_size / phase_duration.value();
 		} else {
+			Bw_limit::Log<VerbosityLevel::DETAILED_LOG>("Utilizing phase infromation for bandwidth\n");
 			file_measured_bw = transaction_size / ftio_phase_pred; 
 		}
 		#else
@@ -303,6 +319,12 @@ void Bw_limit::limit_by_file(bool write, [[maybe_unused]] const std::optional<Pa
 
 #endif
 #ifdef BW_LIMIT
+/**
+ * @brief Limit async write bandwidth based on known duration
+ * @param transaction_size [in] Number of transmitted bytes
+ * @param duration_sec [in] Maximum transaction duration in seconds
+ * @note Limits maximum duration to previous async write phase lenght
+ */
 void Bw_limit::limit_checkpoint(long long transaction_size, double duration_sec) {
 	std::lock_guard lock(bw_lock);
 
@@ -337,14 +359,52 @@ void Bw_limit::limit_checkpoint(long long transaction_size, double duration_sec)
 
 }
 #endif
+
+#ifdef BW_LIMIT
+/**
+ * @brief Limit async read bandwidth based on known duration
+ * @param transaction_size [in] Number of transmitted bytes
+ * @param duration_sec [in] Maximum transaction duration in seconds
+ * @note Limits maximum duration to previous async read phase lenght
+ */
+void Bw_limit::limit_prefetch(long long transaction_size, double duration_sec) {
+	std::lock_guard lock(bw_lock);
+
+	if (!p_ar->phase_active()) {
+		set_throughput_impl(TransactionType::Async_Read);
+		Bw_limit::set_phase_info(TransactionType::Async_Read, "B_avr", bw_limit_iread);
+		last_phase_read_bw = bw_limit_iread;
+		bw_limit_iread = 0.0;
+		total_file_limit_read = 0.0;
+		EMPI_DESIRED_BW_IREAD = 0.0;
+	}
+
+	auto phase_duration = p_ar->get_last_phase_duration();
+
+	double transaction_time = phase_duration? 
+		std::min(phase_duration.value(), duration_sec) : duration_sec;
+	
+	if (transaction_time <= 0.0) return;
+
+	double bw = static_cast<double>(transaction_size) / transaction_time;
+	double prefetch_bw_limit = bw * TOL;
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW, "prefetch read", BLUE, prefetch_bw_limit / 1'000'000, BLACK);
+
+	total_file_limit_read += prefetch_bw_limit;
+	bw_limit_iread = Bw_limit::calculate_bw_limit(total_file_limit_read, last_phase_read_bw);
+	EMPI_DESIRED_BW_IREAD = bw_limit_iread;
+
+	Bw_limit::Log<VerbosityLevel::BASIC_LOG>("%s > rank %i / %i > %s%s %s> BW overall: %.2f Mb/s %s\n",
+					caller, rank, processes - 1, YELLOW, "prefetch read", BLUE, bw_limit_iread / 1'000'000, BLACK);
+
+}
+#endif
 #if BW_LIMIT_GRANULARITY == 1
 
-//! --------------------------- For BW Limiting only -----------------------------------
-//************************************************************************************
-//*                               1. limit_async
-//************************************************************************************
 /**
- * @brief Limits I/O through extern MPI.
+ * @brief Limits I/O through extern MPI based on previous phase behavior.
  */
 void Bw_limit::limit_async() {
 	std::lock_guard lock(bw_lock);
@@ -362,6 +422,10 @@ void Bw_limit::limit_async() {
 	}
 }
 
+/**
+ * @brief Limits I/O through extern MPI based on previous phase behavior.
+ * @param transaction [in] Type of the transaction
+ */
 void Bw_limit::limit_async_impl(TransactionType transaction) {
 	double phase_throughput = set_throughput_impl(transaction);
 
@@ -371,6 +435,7 @@ void Bw_limit::limit_async_impl(TransactionType transaction) {
 		if(ftio_phase_pred < 0.0) {
 			measured_bw = Bw_limit::get_last_phase_info(transaction, "B_sum").value();
 		} else {
+			Bw_limit::Log<VerbosityLevel::DETAILED_LOG>("Utilizing phase infromation for bandwidth\n");
 			measured_bw = Bw_limit::get_last_phase_info(transaction, "data").value() / ftio_phase_pred; 
 		}
 	#else
@@ -408,8 +473,8 @@ void Bw_limit::limit_async_impl(TransactionType transaction) {
 #ifdef BW_LIMIT
 /**
  * @brief Calculates new bandwidth limit based on current strategy
- * @param measured_bw last bw measured for this transaction
- * @param prev_bw_limit last limit applied to this transaction
+ * @param measured_bw [in] Last bw measured for this transaction
+ * @param prev_bw_limit [in] Last limit applied to this transaction
  */
 double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_bw_limit) const
 {
@@ -429,14 +494,9 @@ double Bw_limit::calculate_bw_limit(const double measured_bw, const double prev_
 
 #endif
 
-//!------------------- modify T and duration in case custom MPI version or BW Limit---------------
 #ifdef CUSTOM_MPI
-//************************************************************************************
-//*                               1. set_throughput
-//************************************************************************************
 /**
- * @brief assigns throughput through custom MPI version
- *
+ * @brief Assigns throughput through custom MPI version
  */
 void Bw_limit::set_throughput(void)
 {
@@ -455,12 +515,11 @@ void Bw_limit::set_throughput(void)
 #endif
 
 #if (defined BW_LIMIT) || (defined CUSTOM_MPI)
-//************************************************************************************
-//*                               1. set_throughput
-//************************************************************************************
+//!------------------- modify T and duration in case custom MPI version or BW Limit---------------
 /**
- * @brief assigns throughput through custom MPI version for one transaction type
- * @param tt type of transaction to asign throughput to
+ * @brief Assigns throughput through custom MPI version for one transaction type
+ * @param tt [in] Type of transaction to asign throughput to
+ * @return Throughput during phase
  */
 double Bw_limit::set_throughput_impl(TransactionType tt)
 {
@@ -497,8 +556,8 @@ double Bw_limit::set_throughput_impl(TransactionType tt)
 //*                               1. receive_dominant_frequency
 //************************************************************************************
 /**
- * @brief set dominant io frequency
- *
+ * @brief Set dominant io frequency for bandwdith limit
+ * @param dominant_frequeny [in] Applied frequency
  */
 void Bw_limit::set_io_frequency(double dominant_frequency) {
 	std::lock_guard lock(bw_lock);

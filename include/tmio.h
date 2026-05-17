@@ -34,7 +34,7 @@ namespace tmio {
         ::iotrace_summary(); // Call the C-compatible function
     }
 
-    inline void retrieve_frequencies() {
+    inline void retrieve_FTIO_frequency() {
         ::retrieve_FTIO_frequency();
     }
 

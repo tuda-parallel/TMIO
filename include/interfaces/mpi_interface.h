@@ -3,7 +3,7 @@
 #include "tmio.h"
 
 extern IOtraceMPI mpi_iotrace; //allows to access iotrace in application code
-#if PREFETCH == 1
+#ifdef PREFETCH
 extern Prefetcher prefetcher;
 #endif
 //! -----------------------

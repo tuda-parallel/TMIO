@@ -18,7 +18,7 @@
 IOtraceMPI mpi_iotrace;
 #endif
 
-#if PREFETCH == 1
+#ifdef PREFETCH
 Prefetcher prefetcher;
 #endif
 
@@ -51,10 +51,10 @@ int MPI_Init_thread(int *argc, char ***argv, int required, int *provided)
 int MPI_Finalize()
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-	iotrace_finalize_helper();
-#if PREFETCH == 1 
+#ifdef PREFETCH
 	prefetcher.finalize();
 #endif
+	iotrace_finalize_helper();
 	return PMPI_Finalize();
 }
 
@@ -237,7 +237,7 @@ int MPI_File_write_shared(MPI_File fh, const void *buf, int count, MPI_Datatype 
 int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	CallSignature cs = 
 		CallSignature(fh, count, datatype, 0, CallSignature::CallType::Read);
 	return prefetcher.retrieve_read_async(cs, request, buf);
@@ -260,7 +260,7 @@ int MPI_File_iread(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI
 int MPI_File_iread_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Request *request)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	CallSignature cs = 
 		CallSignature(fh, count, datatype, offset, CallSignature::CallType::ReadAt);
 	return prefetcher.retrieve_read_async(cs, request, buf);
@@ -322,7 +322,7 @@ int MPI_File_iread_shared(MPI_File fh, void *buf, int count, MPI_Datatype dataty
 int MPI_File_read(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	CallSignature cs = 
 		CallSignature(fh, count, datatype, 0, CallSignature::CallType::Read);
 	return prefetcher.retrieve_read_sync(cs, buf, status);
@@ -344,7 +344,7 @@ int MPI_File_read(MPI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_
 int MPI_File_read_at(MPI_File fh, MPI_Offset offset, void *buf, int count, MPI_Datatype datatype, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	CallSignature cs = 
 		CallSignature(fh, count, datatype, offset, CallSignature::CallType::ReadAt);
 	return prefetcher.retrieve_read_sync(cs, buf, status);
@@ -408,7 +408,7 @@ int MPI_File_read_shared(MPI_File fh, void *buf, int count, MPI_Datatype datatyp
 int MPI_Wait(MPI_Request *request, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	int result = prefetcher.fetch_read_async_wait(request, status);
 #else
 	mpi_iotrace.Write_Async_Required(request);
@@ -431,7 +431,7 @@ int MPI_Wait(MPI_Request *request, MPI_Status *status)
 int MPI_Waitall(int count, MPI_Request requests[], MPI_Status statuses[])
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	int result = prefetcher.fetch_read_async_wait_all(count, requests, statuses);
 #else
 	for (int i = 0; i < count; i++)
@@ -463,7 +463,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status)
 {
 	Function_Debug(__PRETTY_FUNCTION__, *flag);
 	
-#if PREFETCH == 1
+#ifdef PREFETCH
 	int result = prefetcher.fetch_read_async_test(request, status, flag);
 #else
 	int result = PMPI_Test(request, flag, status);
@@ -482,7 +482,7 @@ int MPI_Test(MPI_Request *request, int *flag, MPI_Status *status)
 int MPI_Testall(int count, MPI_Request *requests, int *flag, MPI_Status *statuses)
 {
 	Function_Debug(__PRETTY_FUNCTION__);
-#if PREFETCH == 1
+#ifdef PREFETCH
 	int result = prefetcher.fetch_read_async_test_all(count, requests, statuses, flag);
 #else
 	int result = PMPI_Testall(count, requests, flag, statuses);
