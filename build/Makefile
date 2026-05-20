@@ -181,14 +181,18 @@ zmq: zmq_pre zmq_build run
 zmq_pre: zmq_git_build msgpack_git_build
 
 zmq_build: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
-zmq_build: CXX_LIB_FLAGS += -lzmq
+zmq_build: CXX_INC += -I$(TMIO_REPO)/dep/zmq/libzmq/include -I$(TMIO_REPO)/dep/zmq/cppzmq
+# zmq_build: CXX_LIB_FLAGS += -lzmq
+zmq_build: CXX_LIB_FLAGS += -lzmq -L$(TMIO_REPO)/dep/zmq/libzmq/build/lib -Wl,-rpath,$(TMIO_REPO)/dep/zmq/libzmq/build/lib
 zmq_build: CXX_DEBUG += -DFILE_FORMAT=3
 zmq_build: clean_build build
 
 zmq_library: CXX_INC += -I$(TMIO_REPO)/dep/msgpack/msgpack-c/include 
-# zmq_library: CXX_LIB_FLAGS += -lzmq
-zmq_library: override CXX_DEBUG := -DFILE_FORMAT=3
-zmq_library: clean pre zmq_git_build libtmio.so
+zmq_library: CXX_INC += -I$(TMIO_REPO)/dep/zmq/libzmq/include -I$(TMIO_REPO)/dep/zmq/cppzmq
+zmq_library: CXX_LIB_FLAGS += -lzmq -L$(TMIO_REPO)/dep/zmq/libzmq/build/lib -Wl,-rpath,$(TMIO_REPO)/dep/zmq/libzmq/build/lib
+# zmq_library: CXX_DEBUG += -DFILE_FORMAT=3
+zmq_library: override CXX_DEBUG := -DFILE_FORMAT=3 $(CXX_DEBUG)
+zmq_library: clean pre zmq_pre libtmio.so
 
 #**************************************
 #*  MSGPACK support                    *

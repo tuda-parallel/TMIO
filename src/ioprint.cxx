@@ -1,5 +1,8 @@
 #include "ioprint.h"
 
+#include <ios>
+#include <bits/locale_classes.h>
+
 namespace ioprint
 {
 
@@ -379,6 +382,14 @@ namespace ioprint
 		file << print << std::flush;
 		file.flush();
 		file.close();
+
+	#if defined MALLEABLE
+		// Write all to a single summary file:
+		file.open("all_" + std::string(kLibName) + ".jsonl", std::ios_base::app);
+		file << print << std::flush;
+		file.flush();
+		file.close();
+	#endif
 	}
 
 	//**********************************************************************
@@ -717,36 +728,22 @@ namespace ioprint
 
 #elif FILE_FORMAT == 3 // ZMQ
 		zmq::context_t context(1);
+		#if defined MALLEABLE
+		static std::string port = "tcp://172.17.0.1:5555";
+		#else
 		static std::string port = "tcp://127.0.0.1:5555";
-		// zmq::socket_t socket(context, ZMQ_PUSH);
-		// static bool first_time = true;
-		// if (first_time)
-		// {
-		// 	std::ifstream myfile("ftio_port");
-		// 	if (myfile.good() && myfile.is_open())
-		// 	{
-		// 		while (getline(myfile, port))
-		// 		{
-		// 			std::cout << port << '\n';
-		// 		}
-		// 		myfile.close();
-		// 	}
-		// 	first_time = false;
-		// }
-		// socket.bind(port);
-		// zmq::message_t message(buffer.size());
-		// memcpy(message.data(), buffer.data(), buffer.size());
-		// socket.send(message, zmq::send_flags::none);
-
+		#endif
+		
 		// prepare message
 		zmq::message_t message(buffer.size());
 		memcpy(message.data(), buffer.data(), buffer.size());
 
 		// send message
 		zmq::socket_t sender(context, ZMQ_PUSH);
+		printf("Connecting to %s\n", port.c_str());
 		sender.connect(port);
 		sender.send(message, zmq::send_flags::none);
-		printf("Sending over port %s", port.c_str());
+		printf("Sending over port %s\n", port.c_str());
 #endif
 
 		chunk++;

@@ -33,10 +33,27 @@ msgpack () {
 
 
 msgpack_build (){
-	cd ${DIR}/msgpack/msgpack-c
-	git checkout cpp_master
-	cmake . ; 	make 
-	echo "Successfully created ${FUNCNAME[0]}"
+    cd ${DIR}/msgpack/msgpack-c
+    git checkout cpp_master
+    echo -e "${CYAN}Trying msgpack build ...${BLACK}"
+
+    if cmake . && make -j; then
+        echo -e "${GREEN}msgpack built successfully (default)${BLACK}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}Build failed → retrying WITHOUT Boost (same directory)${BLACK}"
+    rm -rf CMakeCache.txt CMakeFiles
+    export CXXFLAGS="${CXXFLAGS} -DMSGPACK_USE_BOOST=OFF -DMSGPACK_DISABLE_BOOST"
+    cmake . || {
+        echo -e "${RED}CMake failed without Boost${BLACK}"
+        return 1
+    }
+    make -j || {
+        echo -e "${RED}Build failed without Boost${BLACK}"
+        return 1
+    }
+    echo -e "${GREEN}msgpack built successfully WITHOUT Boost${BLACK}"
 }
 #######################################
 
