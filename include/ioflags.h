@@ -27,12 +27,6 @@
 #define DEBUG 0 // set debug level for tmio.cxx
 #endif
 
-#ifndef IODATA_VERBOSE
-#define IODATA_VERBOSE 0//set debug level for iodata.cxx
-#endif
-
-#ifndef IOTRACE_VERBOSE
-#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
 enum class VerbosityLevel {
     NONE_LOG = 0,   // No logging
     BASIC_LOG = 1,  // Basic information
@@ -41,8 +35,27 @@ enum class VerbosityLevel {
     TRACE_LOG = 4   // Very verbose, trace-level information
 };
 
-constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
+#ifndef IODATA_VERBOSE
+#define IODATA_VERBOSE 0//set debug level for iodata.cxx
 #endif
+
+#ifndef IOTRACE_VERBOSE
+#define IOTRACE_VERBOSE 0 //set debug level for iodata.cxx
+#endif
+constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE_VERBOSE);
+
+#ifndef DEBUG 
+#define DEBUG 0 // set debug level for tmio.cxx
+#endif
+
+#ifndef IODATA_VERBOSE
+#define IODATA_VERBOSE 0//set debug level for iodata.cxx
+#endif
+
+#ifndef PREFETCH_VERBOSE
+#define PREFETCH_VERBOSE 0 //set debug level for prefetch.cxx
+#endif
+constexpr VerbosityLevel PREFETCH_VERBOSITY = static_cast<VerbosityLevel>(PREFETCH_VERBOSE);
 
 #ifndef IOANALYSIS_VERBOSE
 #define IOANALYSIS_VERBOSE 0 //set debug level for ioanalysis.cxx
@@ -59,6 +72,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #ifndef BW_LIMIT_VERBOSE
 #define BW_LIMIT_VERBOSE 0 //controls debug of bw_limit in  bw_limit.cxx
 #endif
+constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIMIT_VERBOSE);
 
 // #define TIME_VERBOSE  //Trace time of rank 0 
 
@@ -91,7 +105,7 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 
 #ifndef SAME_T_END // same end time for phase in iodata.cxx
-#define SAME_T_END 1
+#define SAME_T_END 0
 #endif
 
 #ifndef SKIP_LAST_WRITE
@@ -186,7 +200,15 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 // if set to above 0, the confidence check is executed
 #endif
 
-
+//* Output File     
+//*******************************
+#ifndef FILE_FORMAT
+#define FILE_FORMAT 0
+// 0 FILE_FORMAT "jsonl"
+// 1 FILE_FORMAT "binary" 
+// 2 FILE_FORMAT "msgpack" 
+// 3 FILE_FORMAT "zmq" 
+#endif
 
 //* Bandwidth Limit  
 //*******************************
@@ -208,28 +230,40 @@ constexpr VerbosityLevel IOTRACE_VERBOSITY = static_cast<VerbosityLevel>(IOTRACE
 #endif
 // Defines the Limiting strategy
 #ifndef BW_LIMIT_STRATEGY
-#define BW_LIMIT_STRATEGY 2 // 0: always (default) -- 1: increase only -- 2: limit the down side 
+#define BW_LIMIT_STRATEGY 0 // 0: always (default) -- 1: increase only -- 2: limit the down side 
 #endif
+
+#ifndef BW_LIMIT_FREQ
+#define BW_LIMIT_FREQ 0
+#endif
+
 // Tolerance value to scale the desired values
 #ifndef TOL
 #define TOL 1.1
 #endif
+
+// Defines bandwidth limiting granularity
+#ifndef BW_LIMIT_GRANULARITY
+#define BW_LIMIT_GRANULARITY 1
+// 0 No Limit
+// 1 By phase
+// 2 By request size
+// 3 By prev file bw
+// 4 By prev file bw - scaled by transaction size
+#endif
 #endif
 
-
-
-//* Output File     
-//*******************************
-#ifndef FILE_FORMAT
-#define FILE_FORMAT 0
-// 0 FILE_FORMAT "jsonl"
-// 1 FILE_FORMAT "binary" 
-// 2 FILE_FORMAT "msgpack" 
-// 3 FILE_FORMAT "zmq" 
+#ifdef PREFETCH
+#if FILE_FORMAT == 3
+#ifndef FETCH_FTIO_FREQ
+#define FETCH_FTIO_FREQ 0 // If set to 1, fetch frequency from FTIO
+#endif
 #endif
 
-
-
+#ifndef CONSIDER_PREV_N
+#define CONSIDER_PREV_N 2
+#endif
+#endif
 
 //* Other Settings
 //*******************************

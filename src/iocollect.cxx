@@ -29,7 +29,9 @@ double collect::get(std::string mode) const
         return B_sum;
     else if (mode == "B_avr")
         return B_avr;
-    else
+    else if (mode == "data")
+        return data;
+    else 
         return 0;
 }
 
@@ -49,6 +51,8 @@ void collect::set(std::string mode, double value)
         B_sum = value;
     else if (mode == "B_avr")
         B_avr = value;
+    else if (mode == "data")
+        data = value;
     else
         printf("not supported assignment");
 }

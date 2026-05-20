@@ -1,6 +1,15 @@
+#ifndef IO_DATA_H
+#define IO_DATA_H
+
+#include "file_tracker.h"
+#include "ioprint.h"
+#include <map>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
 #include <stdio.h>
 #include <string.h>
-#include "ioprint.h"
+#include <unordered_map>
 
 /**
  *  IO trace class
@@ -19,15 +28,23 @@
     *
     */
 class IOdata{
+public:
+    enum class TransactionType {
+        Async_Write,
+        Async_Read,
+        Sync_Write,
+        Sync_Read,
+    };
 
-public: 
+private:
+    
     //* Variables:
     //************
     int  rank;                // current rank
-    bool phase;
-    bool a_or_s_flag; // true = async | false = sync         
-    bool w_or_r_flag; // true = write | false = read         
-
+    TransactionType transaction_type;  // type of transaction this data belongs to
+    mutable std::shared_mutex phase_data_lock; // FIX: More fine grained locking
+    const char* transaction_identifier;
+    
     //*******************************
     //* I/O information during phase
     //*******************************
@@ -37,28 +54,39 @@ public:
     std:: vector<double>    t_act_e;  // actaul end time
     std:: vector<double>    t_req_s;  // required start time (usually same as t_act_s)
     std:: vector<double>    t_req_e;  // required end time
+    std:: vector<long long> bytes;    // bytes transfered by the I/O operation
     std:: vector<int>       phases;   // phase the current I/O operation belongs to
-    
+#if BW_LIMIT_GRANULARITY > 2
+    struct file_stats {
+        std::vector<size_t> indexes;
+        std::map<size_t, size_t> phase_count;
+        std::map<size_t, size_t> phase_accesses;
+    };
+
+    std:: unordered_map<PathID, file_stats> path_to_io;   // I/O operations for each file
+#endif
     //*******************************
     //* Phase information 
     //*******************************   
-    std:: vector<collect>   phase_data;
+    bool phase;
+    std:: vector<collect> phase_data;
+public:
     collect tmp;
-    
+
     //* Methods:
     //************
     IOdata();
-    void Mode(int,bool,bool=true); // set if read or write and if actual or required
+    void Mode(int,TransactionType); // set if read or write and if actual or required
     //? phase start
-    void Phase_Start(bool, double,long long,long long );
+    void Phase_Start(bool,double,long long,long long,const std::optional<PathID> = std::nullopt);
     
-    //? add I/O tracr or claer all I/O traces
-    void Add_Io(bool,long long,double,double);
+    //? clear all I/O traces
     void Clear_IO(void);
+    void Add_IO_Act(long long,double,double);
     
     //? for Async tracing 
-    void Phase_End_Req(long long,double,double);
     void Phase_End_Act(long long,double,double,bool);
+    void Phase_End_Req(long long,double,double, const std::optional<PathID>);
     
     //? for Sync tracing 
     void Phase_End_Sync(double);
@@ -68,19 +96,49 @@ public:
     T Sum(std::string);
     template <class T>
     T Max(std::vector<T>);
+
+    std::vector<double> get_bandwidth_act();
+    std::vector<double> get_bandwidth_req();
+    std::vector<double> get_t_act_s();
+    std::vector<double> get_t_act_e();
+    std::vector<double> get_t_req_s();
+    std::vector<double> get_t_req_e();
+    
+    void gather_phase_data(MPI_Datatype, collect*, int*, int*, MPI_Comm);
+    void clear_phase_data();
+
+    TransactionType get_transaction_type();
+    const char* type_string(TransactionType);
+    bool phase_active();
+    bool is_async();
+    bool is_write();
+    std::optional<double> get_last_phase_info(std::string);
+    std::optional<double> get_last_phase_duration();
+    void set_last_phase_info(std::string, double);
+    size_t get_phase_count();
+    void close_sync_phase();
+
+#if BW_LIMIT_GRANULARITY > 2
+    bool get_prev_phase_file_stats(const PathID&, long long&, double&);
+#endif
     
     //? calculate the Bandwidth after the application finishes
     void Bandwidth_In_Phase_Offline(void);
-    
-    //? Debug
-    void Debug_Info_Bandwidth_In_Phase(void);
-
 
 private: 
     char caller[12] = "\tIOdata "; // name of the class
-    char w_or_r[6];   // write or read
-    char a_or_s[6];   // async or sync
     long long count_opertaions(long long); //counts operation in a phase
     long long count_opertaions_agg(long long);  //counts all operations bellow input
     long long online_counter;
+
+    void Phase_End_Sync_Impl(double);
+
+    //? add I/O traces
+    void Add_IO_Act_Impl(long long,double,double);
+    void Add_IO_Req(long long,double,double, const std::optional<PathID>);
+
+    //? Debug
+    void Debug_Info_Bandwidth_In_Phase(void);
 };
+
+#endif // IO_DATA_H

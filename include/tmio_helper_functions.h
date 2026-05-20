@@ -1,11 +1,11 @@
 #ifndef TMIO_HELPER_FUNCTIONS_H
 #define TMIO_HELPER_FUNCTIONS_H
 
-#include <dlfcn.h>
-#include <stdlib.h>
 #include <atomic>
 #include <cstdint> // For uint64_t
+#include <dlfcn.h>
 #include <iostream>
+#include <stdlib.h>
 #include <string>
 #include <vector>
 
@@ -63,6 +63,10 @@ namespace functiontracing
     class FunctionTracer;
     FunctionTracer &get_tracer();
 }
+
+#if FETCH_FTIO_FREQ == 1
+void retrieve_FTIO_frequency(double& frequency, double& confidence);
+#endif
 
 // std::atomic<uint64_t> request_id_counter(0);
 // uint64_t generate_unique_id()
