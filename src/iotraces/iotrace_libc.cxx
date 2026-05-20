@@ -127,7 +127,7 @@ void IOtraceLibc::Read_Async_Start(const struct aiocb *aiocbp)
     BEFORE_MAIN_GUARD_FUNCTION();
 
     double start_time = MPI_Wtime() - t_0;
-    data_size_read = 1; // in B
+
     long long total_size = aiocbp->aio_nbytes;
 
     IOtraceLibc::LogWithAction<VerbosityLevel::BASIC_LOG>([&]()
@@ -216,7 +216,6 @@ void IOtraceLibc::Write_Sync_Start(size_t count, off64_t offset)
     double start_time = MPI_Wtime() - t_0;
     t_sync_write_start = Overhead_Start(start_time);
 
-    data_size_write = 1; // in B
     size_sync_write = count * 1; // in B
     Write_Sync_Start_Impl(size_sync_write, offset, start_time);
 }
@@ -272,7 +271,7 @@ void IOtraceLibc::Batch_Write_Sync_End()
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
+    double t_sync_write_end = Overhead_Start(MPI_Wtime() - t_0);
 
     if (!batch_writing)
     {
@@ -281,7 +280,7 @@ void IOtraceLibc::Batch_Write_Sync_End()
         return;
     }
 
-    p_sw->Add_Io(0, size_sync_write, t_sync_write_start, t_sync_write_end);
+    p_sw->Add_IO_Act(size_sync_write, t_sync_write_start, t_sync_write_end);
 
 #if SYNC_MODE == 0
     p_sw->Phase_End_Sync(t_sync_write_end);
@@ -294,9 +293,9 @@ void IOtraceLibc::Batch_Write_Sync_End()
     IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i > Batch sync write ended successfully.\n", caller, rank);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sw->phase_data.back().t_end_act, BLACK);
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sw->get_last_phase_info("t_end_act").value(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> batch writing ended at %f %s\n", caller, rank, RED, p_sw->phase_data.back().t_end_act, BLACK);
+        "%s > rank %i %s>>> batch writing ended at %f %s\n", caller, rank, RED, p_sw->get_last_phase_info("t_end_act").value(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> batch writing size %lli %s\n", caller, rank, YELLOW, size_sync_write, BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
@@ -324,7 +323,6 @@ void IOtraceLibc::Read_Sync_Start(size_t count, off64_t offset)
     double start_time = MPI_Wtime() - t_0;
     t_sync_read_start = Overhead_Start(start_time);
 
-    data_size_read = 1; // in B
     size_sync_read = count * 1; // in B
     Read_Sync_Start_Impl(size_sync_read, offset, start_time);
 }
@@ -348,7 +346,6 @@ void IOtraceLibc::Batch_Read_Sync_Start(size_t count, off64_t offset)
 
     t_sync_read_start = Overhead_Start(MPI_Wtime() - t_0);
 
-    data_size_read = 1; // in B
     size_sync_read = count * 1; // in B
 
     // Phase start if first request. Add phase data and offset
@@ -380,7 +377,7 @@ void IOtraceLibc::Batch_Read_Sync_End()
 {
     BEFORE_MAIN_GUARD_FUNCTION();
 
-    t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
+    double t_sync_read_end = Overhead_Start(MPI_Wtime() - t_0);
 
     if (!batch_reading)
     {
@@ -389,7 +386,7 @@ void IOtraceLibc::Batch_Read_Sync_End()
         return;
     }
 
-    p_sr->Add_Io(0, size_sync_read, t_sync_read_start, t_sync_read_end);
+    p_sr->Add_IO_Act(size_sync_read, t_sync_read_start, t_sync_read_end);
 
 #if SYNC_MODE == 0
     p_sr->Phase_End_Sync(t_sync_read_end);
@@ -402,9 +399,9 @@ void IOtraceLibc::Batch_Read_Sync_End()
     IOtraceLibc::Log<VerbosityLevel::BASIC_LOG>(
         "%s > rank %i > Batch sync read ended successfully.\n", caller, rank);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sr->phase_data.back().t_end_act, BLACK);
+        "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, p_sr->get_last_phase_info("t_end_act").value(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
-        "%s > rank %i %s>>> batch reading ended at %f %s\n", caller, rank, RED, p_sr->phase_data.back().t_end_act, BLACK);
+        "%s > rank %i %s>>> batch reading ended at %f %s\n", caller, rank, RED, p_sr->get_last_phase_info("t_end_act").value(), BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> batch reading size %lli %s\n", caller, rank, YELLOW, size_sync_read, BLACK);
     IOtraceLibc::Log<VerbosityLevel::DEBUG_LOG>(

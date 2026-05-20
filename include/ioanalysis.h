@@ -48,7 +48,7 @@ public:
 		// TODO: find a better way to compare these, as request can change from outside
 		if constexpr (std::is_same<Tag, MPI_Tag>::value)
 		{
-			return ((request != nullptr) && (ptr == request)) || (handle == *request);
+			return ((request != nullptr) && (ptr == request)) /*|| (handle == *request)*/;
 		}
 		else if constexpr (std::is_same<Tag, IOuring_Tag>::value || std::is_same<Tag, Libc_Tag>::value)
 		{

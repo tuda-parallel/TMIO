@@ -26,7 +26,7 @@ OPENMPTHREADS := 4
 
 MPICXX = mpicxx
 MPIRUN = mpirun
-CXX_DEBUG  := 
+CXX_DEBUG  :=  
 MPI_RUN_FLAGS =
 
 # MPICXX   = $(TMIO_REPO)/bw_limit/mpich-4.0.3/mpich-bin/bin/mpicxx
@@ -62,7 +62,7 @@ endif
 
 SCOREP     := scorep --mpp=mpi --thread=pthread --io=posix --user $(MPICXX)
 PREFIX     :=
-CXX_FLAGS  := 
+CXX_FLAGS  := -std=c++17
 CXX        := g++
 CXX_INC    := 
 CXX_LIB_FLAGS:= -ldl

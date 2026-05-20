@@ -28,6 +28,7 @@ struct IOtraceTraits<MPI_Tag>
 {
     using RequestType = MPI_Request;
     using RequestIDType = MPI_Request *;
+    using FDType = MPI_File;
     static constexpr const char *Name = "MPI";
 };
 
@@ -39,6 +40,7 @@ struct IOtraceTraits<Libc_Tag>
 {
     using RequestType = struct aiocb;
     using RequestIDType = struct aiocb *;
+    using FDType = int;
     static constexpr const char *Name = "Libc";
 };
 
@@ -50,6 +52,7 @@ struct IOtraceTraits<IOuring_Tag>
 {
     using RequestType = __u64;
     using RequestIDType = __u64;
+    using FDType = int;
     static constexpr const char *Name = "IOuring";
 };
 

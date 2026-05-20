@@ -1,16 +1,19 @@
 #ifndef IOTRACE_H
 #define IOTRACE_H
 
+#include "iotrace_traits.h"
+#include "ioanalysis.h"
 #include "tmio_helper_functions.h"
-#include <shared_mutex>
-#include <mutex>
-#include <cstdarg>
 #include <atomic>
-#include <unordered_map>
-#include <thread>
-#include <condition_variable>
+#include <cstdarg>
+#include <mutex>
+#include <shared_mutex>
 #include <vector>
 #include <cassert>
+#include <condition_variable>
+#include <optional>
+#include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include "ioflags.h"
 
@@ -20,8 +23,7 @@
 
 #if defined BW_LIMIT || defined CUSTOM_MPI
 #include "bw_limit.h"
-#else
-#include "ioanalysis.h"
+#include "file_tracker.h"
 #endif
 #include "iotrace_traits.h"
 /**
@@ -43,14 +45,15 @@ protected:
 public:
 	using RequestType = typename IOtraceTraits<Tag>::RequestType;
 	using RequestIDType = typename IOtraceTraits<Tag>::RequestIDType;
+	using FDType = typename IOtraceTraits<Tag>::FDType;
 
 	static constexpr const char *kLibName = IOtraceTraits<Tag>::Name;
 
 	// Mandatory for initialization of IOdata
 	void Init(void);
-	void Open(void);
+	void Open(const char *, FDType);
 	void Summary(void);
-	void Close(void);
+	void Close(const FDType);
 
 	int Get_Relevant_Ranks(MPI_File fh);
 
@@ -59,43 +62,44 @@ public:
 	//*************************************
 	void Set(std::string, bool);
 
-#if defined BW_LIMIT
-	void Apply_Limit(void);
-#elif defined CUSTOM_MPI
-	void Replace_Test(void);
+#if BW_LIMIT_FREQ == 1
+	void set_bw_limit_freq(double frequency);
+#endif
+#if BW_LIMIT_GRANULARITY > 1
+	void apply_file_specific_bw_impl(bool, FDType, long long);
+#endif
+	void apply_checkpoint_limit_impl(long long, double);
+	void apply_prefetch_limit_impl(long long, double);
+#if BW_LIMIT_GRANULARITY == 1
+	void apply_bw_limit(void);
+#endif
+#ifdef CUSTOM_MPI
+	void set_custom_throughput(void);
 #endif
 
 protected:
 	int rank;			 // current MPI rank
 	int processes;		 // number of ranks
-	double open;		 // flag indicating file status
-	int data_size_read;	 // store size of variable for read
-	int data_size_write; // store size of variable for write
+	bool open;		 	 // flag indicating file status
 
-	// FIXME: Use function local varaibel to replace the global ones for multiple threads
-	double t_async_write_start; // time stamp for start of async write operation
-	double t_sync_write_start;	// time stamp for start of sync write operation
-	double t_async_read_start;	// time stamp for start of async read operation
-	double t_sync_read_start;	// time stamp for start of sync read operation
-	double t_sync_read_end;
-	double t_sync_write_end;
+	// FIXME: Use function local varaibel to replace the thread_local ones
+	inline static thread_local double t_sync_read_start;
+	inline static thread_local double t_sync_write_start;
 
-	// FIXME: Use function local varaibel to replace the global ones for multiple threads
-	long long size_async_write; // size of async write operation in KB
-	long long size_sync_write;	// size of sync write operation in KB
-	long long size_async_read;	// size of async read operation in KB
-	long long size_sync_read;	// size of async read operation in KB
+	// FIXME: Use function local varaibel to replace the thread_local ones
+	inline static thread_local long long size_sync_write;	// size of sync write operation in KB
+	inline static thread_local long long size_sync_read;	// size of async read operation in KB
 
 	double t_0;						// start time of app (for each rank)
-	double delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
-	double t_overhead = 0;			// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
-	double delta_t_io_overhead = 0; // elapsed in-period overhead during io tracing since last IOtrace::Summary calling (for each rank)
+	std::atomic<double> delta_t_app = 0;			// elapsed app running time since last IOtrace::Summary calling (for each rank)
+	inline static thread_local double t_overhead;	// time when IOtrace::Overhead_Start is called, relatived to t_0 (for each rank)
+	std::atomic<double> delta_t_io_overhead = 0; // elapsed in-period overhead during io tracing since last IOtrace::Summary calling (for each rank)
 	double t_summary = 0;			// elapsed time (for each rank) FIXME: Looks should be the MPI_Wtime when last time IOtrace::Summary is finishing its called
 
 	bool online_file_generation = false; // elapsed time (for each rank)
 	bool finalize = false;
 
-	// FIXME: Add pthread lock to protect the following variables
+	// FIXME: Add more fine grained locking
 	// ques for async tracing
 	std::vector<double> async_write_time;
 	std::vector<long long> async_write_size;
@@ -117,8 +121,12 @@ protected:
 	IOdata *p_sw;
 	IOdata *p_sr;
 
-#if defined BW_LIMIT || defined CUSTOM_MPI
+#if (defined BW_LIMIT) || (defined CUSTOM_MPI)
 	Bw_limit bw_limit;
+#endif
+
+#if BW_LIMIT_GRANULARITY > 2
+	FileTracker<FDType, RequestIDType> file_tracker;
 #endif
 
 	char caller[12] = "\tIOtrace";
@@ -127,7 +135,7 @@ protected:
 	//*************************************
 	//* Write tracing
 	//*************************************
-    void Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Write_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd = std::nullopt);
     void Write_Async_End_Impl(RequestIDType request, int write_status);
     void Write_Async_Required_Impl(RequestIDType request);
     void Write_Sync_Start_Impl(long long size, long long offset, double start_time);
@@ -136,7 +144,7 @@ protected:
 	//*************************************
 	//* Read tracing
 	//*************************************
-    void Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time);
+    void Read_Async_Start_Impl(RequestIDType requestID, long long size, long long offset, double start_time, std::optional<FDType> fd = std::nullopt);
     void Read_Async_End_Impl(RequestIDType request, int read_status);
     void Read_Async_Required_Impl(RequestIDType request);
     void Read_Sync_Start_Impl(long long size, long long offset, double start_time);
@@ -237,20 +245,30 @@ public:
 	//*************************************
 	//* MPI Write tracing
 	//*************************************
-	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_Offset offset = 0);
+	void Write_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset);
 	void Write_Async_End(MPI_Request *, int write_status = 1);
 	void Write_Async_Required(MPI_Request *);
-	void Write_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
-	void Write_Sync_End(void);
+	void Write_Sync_Start(int, MPI_Datatype, MPI_Offset offset);
+	void Write_Sync_End();
 
 	//*************************************
 	//* MPI Read tracing
 	//*************************************
-	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_Offset offset = 0);
+	void Read_Async_Start(int, MPI_Datatype, MPI_Request *, MPI_File fd, MPI_Offset offset);
 	void Read_Async_End(MPI_Request *request, int read_status = 1);
 	void Read_Async_Required(MPI_Request *);
-	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset = 0);
-	void Read_Sync_End(void);
+	void Read_Sync_Start(int, MPI_Datatype, MPI_Offset offset);
+	void Read_Sync_End();
+
+	//*************************************
+	//* MPI limit bandwidth
+	//*************************************
+#if BW_LIMIT_GRANULARITY > 1
+	void apply_file_specific_bw(bool, MPI_File, int, MPI_Datatype);
+#endif
+#ifdef BW_LIMIT
+	void apply_checkpoint_limit(int count, MPI_Datatype datatype, double finish_time);
+#endif
 };
 
 #if ENABLE_LIBC_TRACE == 1
@@ -277,7 +295,7 @@ public:
 	void Write_Async_Required(const struct aiocb64 *aiocbp);
 	void Write_Sync_Start(size_t count, off64_t offset = 0);
 	void Batch_Write_Sync_Start(size_t count, off64_t offset = 0);
-	void Write_Sync_End(void);
+	void Write_Sync_End();
 	void Batch_Write_Sync_End();
 
 	//*************************************
@@ -291,7 +309,7 @@ public:
 	void Read_Async_Required(const struct aiocb64 *aiocbp);
 	void Read_Sync_Start(size_t count, off64_t offset = 0);
 	void Batch_Read_Sync_Start(size_t count, off64_t offset = 0);
-	void Read_Sync_End(void);
+	void Read_Sync_End();
 	void Batch_Read_Sync_End();
 };
 #endif // ENABLE_LIBC_TRACE

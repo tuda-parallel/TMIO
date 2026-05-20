@@ -7,6 +7,9 @@
 #include <mutex>
 #include <thread>
 #include <unistd.h> // Required for getpid()
+#if FETCH_FTIO_FREQ == 1
+#include <zmq.hpp>
+#endif
 
 namespace functiontracing
 {
@@ -241,3 +244,38 @@ void Function_Debug(std::string function_name, int test_flag)
     functiontracing::get_tracer().add_trace(function_name);
 #endif
 }
+
+#if FETCH_FTIO_FREQ == 1
+void retrieve_FTIO_frequency(double& dominant_frequency, double& confidence) {
+    int rank;
+    MPI_Comm IO_WORLD;
+    double values[2] = {-1.0, -1.0};
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    int root = 0;
+
+	if (rank == root) {
+		zmq::context_t context(1);
+		zmq::socket_t receiver(context, ZMQ_PULL);
+		receiver.bind("tcp://127.0.0.1:5556");
+		
+		zmq::message_t msg;
+		auto res = receiver.recv(msg, zmq::recv_flags::dontwait);
+
+		if (res.has_value() && msg.size() == sizeof(double)*2) {
+			std::memcpy(values, msg.data(), sizeof(double)*2);
+            printf("Received dominant frequency\n");
+		} else {
+            printf("Received no valid data\n");
+        }
+	}
+
+	MPI_Bcast(values, 2, MPI_DOUBLE, root, MPI_COMM_WORLD);
+
+    if (values[0] >= 0.0) {
+        dominant_frequency = values[0];
+        confidence = values[1];
+    }
+}
+#endif
