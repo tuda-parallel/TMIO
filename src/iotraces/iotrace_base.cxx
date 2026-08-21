@@ -1,4 +1,5 @@
 #include "iotrace.h"
+#include <type_traits>
 
 /**
  * @file iotrace.cpp
@@ -313,6 +314,10 @@ void IOtraceBase<Tag>::Write_Async_Start_Impl(RequestIDType requestID, long long
     IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
+    if constexpr (!std::is_same_v<Tag, MPI_Tag>)
+        if (tmio::in_mpi_io_call)
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+                "%s > rank %i > invoked_from: MPI-IO call (nested POSIX transaction)\n", caller, rank);
     Overhead_End();
 }
 
@@ -424,6 +429,10 @@ void IOtraceBase<Tag>::Read_Async_Start_Impl(RequestIDType requestID, long long 
     IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
+    if constexpr (!std::is_same_v<Tag, MPI_Tag>)
+        if (tmio::in_mpi_io_call)
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+                "%s > rank %i > invoked_from: MPI-IO call (nested POSIX transaction)\n", caller, rank);
     Overhead_End();
 }
 
@@ -536,6 +545,10 @@ void IOtraceBase<Tag>::Write_Sync_Start_Impl(long long size, long long offset, d
     IOtraceBase<Tag>::Log<VerbosityLevel::DETAILED_LOG>(
         "%s > rank %i %s>> started sync write @ %.2f s %s\n", caller, rank,
         GREEN, t_sync_write_start, BLACK);
+    if constexpr (!std::is_same_v<Tag, MPI_Tag>)
+        if (tmio::in_mpi_io_call)
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+                "%s > rank %i > invoked_from: MPI-IO call (nested POSIX transaction)\n", caller, rank);
     Overhead_End();
 }
 
@@ -585,6 +598,10 @@ void IOtraceBase<Tag>::Read_Sync_Start_Impl(long long size, long long offset, do
     IOtraceBase<Tag>::Log<VerbosityLevel::DEBUG_LOG>(
         "%s > rank %i %s>>> has offset %lli %s\n", caller, rank, YELLOW, offset,
         BLACK);
+    if constexpr (!std::is_same_v<Tag, MPI_Tag>)
+        if (tmio::in_mpi_io_call)
+            IOtraceBase<Tag>::Log<VerbosityLevel::BASIC_LOG>(
+                "%s > rank %i > invoked_from: MPI-IO call (nested POSIX transaction)\n", caller, rank);
 
     Overhead_End();
 }

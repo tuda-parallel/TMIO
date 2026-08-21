@@ -50,3 +50,13 @@ Run the example with the following command:
 ```
 make run_limit CXX_DEBUG+="-DBW_LIMIT_STRATEGY=2 -DBW_LIMIT_GRANULARITY=1"
 ```
+
+## POSIX AIO bandwidth limiting
+`BW_LIMIT_POSIX_AIO=1` (see `include/ioflags.h`) reimplements `aio_write`/`aio_read`/`aio_error`/`aio_return`/`aio_suspend`/`lio_listio`/`aio_cancel` on top of TMIO's own `io_uring` instance instead of glibc's AIO, so submissions/completions become a point to pace against. Build and run it with:
+```sh
+make bw_limit_iouring_library   # links against the custom MPICH above; MPICXX defaults to dep/bw_limit_mpich/mpich-bin/bin/mpicxx
+HWLOC_COMPONENTS=-gl LD_PRELOAD=./libtmio.so /path/to/mpi-bin/bin/mpirun -launcher fork -n 1 ./your_app
+```
+`-launcher fork` avoids needing a local `sshd` (this MPICH's `mpirun` defaults to ssh even for a local job). `HWLOC_COMPONENTS=-gl` avoids `MPI_Init` hanging in `hwloc`'s GL/X11 GPU-topology probe on a machine with a live X/Wayland session.
+
+`BW_LIMIT_LAYER` (`include/ioflags.h`) picks which layer paces MPI-IO-driven POSIX traffic (MPI's ROMIO patch vs. this POSIX layer) so the two don't double-pace; POSIX AIO with no MPI-IO in its call chain always paces here regardless of the setting. `lio_listio`'s `sevp` (SIGEV_* completion notification) is not supported under this backend and is silently ignored — glibc's own async completion signals need its native AIO thread pool, which this path deliberately bypasses.

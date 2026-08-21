@@ -21,6 +21,16 @@
 // 1: enable tracing
 #endif
 
+// Reimplements POSIX aio_read/aio_write/lio_listio on top of TMIO's own
+// io_uring instance instead of passing them through to glibc's AIO. Needed
+// so POSIX async I/O can be bandwidth-limited (glibc's AIO worker threads
+// give no observable submission/completion point to pace against).
+// Requires ENABLE_IOURING_TRACE=1 and linking against liburing (see
+// build/Makefile's iouring_library target).
+#ifndef BW_LIMIT_POSIX_AIO
+#define BW_LIMIT_POSIX_AIO 0 // set to 1 to enable
+#endif
+
 //* DEBUG Flags
 //*******************************
 #ifndef DEBUG 
@@ -235,6 +245,15 @@ constexpr VerbosityLevel BW_LIMIT_VERBOSITY = static_cast<VerbosityLevel>(BW_LIM
 
 #ifndef BW_LIMIT_FREQ
 #define BW_LIMIT_FREQ 0
+#endif
+
+// ROMIO's ufs ADIO driver calls down into POSIX pwrite/pread to service
+// MPI-IO. When BW_LIMIT_POSIX_AIO is also enabled, both layers can see the
+// same bytes; this picks which one actually paces them so they don't stack.
+// Transactions with no MPI-IO in their call chain always pace at the POSIX
+// layer regardless of this setting (see tmio::in_mpi_io_call).
+#ifndef BW_LIMIT_LAYER
+#define BW_LIMIT_LAYER 0 // 0: MPI paces MPI-IO traffic (default) -- 1: POSIX paces it
 #endif
 
 // Tolerance value to scale the desired values

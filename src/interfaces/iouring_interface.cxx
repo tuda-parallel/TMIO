@@ -170,4 +170,13 @@ unsigned TMIO_DECL(io_uring_peek_batch_cqe)(struct io_uring *ring, struct io_uri
     return ret;
 }
 
+#if BW_LIMIT_POSIX_AIO == 1
+// See declaration comment in include/interfaces/iouring_interface.h.
+int tmio_real_io_uring_queue_init(unsigned entries, struct io_uring *ring, unsigned flags)
+{
+    MAP_OR_FAIL(io_uring_queue_init);
+    return __real_io_uring_queue_init(entries, ring, flags);
+}
+#endif
+
 #endif // ENABLE_IOURING_TRACE == 1

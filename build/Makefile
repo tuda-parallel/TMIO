@@ -191,6 +191,29 @@ zmq_library: override CXX_DEBUG := -DFILE_FORMAT=3
 zmq_library: clean pre zmq_git_build libtmio.so
 
 #**************************************
+#*  io_uring POSIX AIO support         *
+#**************************************
+iouring_library: CXX_INC += -I$(TMIO_REPO)/dep/liburing/liburing/src/include
+# --no-as-needed: every liburing call in this library is resolved via dlsym(RTLD_NEXT, ...)
+# (see MAP_OR_FAIL), not a direct symbol reference, so the default --as-needed linker
+# behavior would otherwise drop liburing.so from libtmio.so's NEEDED list entirely --
+# and then dlsym(RTLD_NEXT, ...) has nothing to find it in at runtime.
+iouring_library: CXX_LIB_FLAGS += -L$(TMIO_REPO)/dep/liburing/liburing/src -Wl,--no-as-needed -luring -Wl,-rpath,$(TMIO_REPO)/dep/liburing/liburing/src
+iouring_library: override CXX_DEBUG := -DENABLE_IOURING_TRACE=1 -DBW_LIMIT_POSIX_AIO=1
+iouring_library: clean pre iouring_git_build libtmio.so
+
+# Same as iouring_library, but also links against the custom bandwidth-limiting
+# MPICH (see docs/bandwidth_limit.md) so -DBW_LIMIT's EMPI_* externs resolve,
+# enabling actual pacing of POSIX AIO traffic (not just io_uring-backed tracing).
+# MPICXX defaults to the vendored build; override on the command line to point
+# at a different bw-limit MPICH install.
+bw_limit_iouring_library: MPICXX = $(TMIO_REPO)/dep/bw_limit_mpich/mpich-bin/bin/mpicxx
+bw_limit_iouring_library: CXX_INC += -I$(TMIO_REPO)/dep/liburing/liburing/src/include
+bw_limit_iouring_library: CXX_LIB_FLAGS += -L$(TMIO_REPO)/dep/liburing/liburing/src -Wl,--no-as-needed -luring -Wl,-rpath,$(TMIO_REPO)/dep/liburing/liburing/src
+bw_limit_iouring_library: override CXX_DEBUG := -DENABLE_IOURING_TRACE=1 -DBW_LIMIT_POSIX_AIO=1 -DBW_LIMIT
+bw_limit_iouring_library: clean pre iouring_git_build bw_limit_mpich_git_build libtmio.so
+
+#**************************************
 #*  MSGPACK support                    *
 #**************************************
 msgpack: msgpack_build run
@@ -529,3 +552,17 @@ msgpack_git_build:
 zmq_git_build:
 	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
 	$(TMIO_REPO)/dep/create_lib.sh "zmq" || echo "Failed to build ZMQ"
+
+iouring_git_build:
+	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
+	$(TMIO_REPO)/dep/create_lib.sh "liburing" || echo "Failed to build liburing"
+
+# Unlike the other *_git_build targets, this skips the rebuild if the custom
+# mpicxx already exists: compilar.sh does a full `make clean` + reconfigure +
+# rebuild of MPICH every time it runs (tens of minutes), so re-triggering it
+# on every `make bw_limit_iouring_library` would make the target unusable.
+# Remove dep/bw_limit_mpich/mpich-bin to force a rebuild.
+bw_limit_mpich_git_build:
+	chmod u+x $(TMIO_REPO)/dep/create_lib.sh
+	test -x $(TMIO_REPO)/dep/bw_limit_mpich/mpich-bin/bin/mpicxx || \
+		$(TMIO_REPO)/dep/create_lib.sh "bw_limit_mpich" || echo "Failed to build bw-limit MPICH"

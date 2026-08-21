@@ -74,6 +74,7 @@ TMIO intercepts the following POSIX functions:
 *   `lio_listio`, `lio_listio64` (Batch)
 *   `aio_error`, `aio_return` (Completion monitoring)
 *   `aio_suspend` (Waiting)
+*   `aio_cancel`, `aio_cancel64` (Cancellation; passthrough by default, `io_uring`-backed under `BW_LIMIT_POSIX_AIO`, see [Bandwidth Limiting](bandwidth_limit.md))
 
 ---
 

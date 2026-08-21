@@ -52,6 +52,27 @@
         }                                                                \
     }
 #endif
+namespace tmio
+{
+    // Set for the duration of an MPI-IO data call (MPI_File_{read,write,iread,iwrite}*),
+    // so the POSIX interceptor can tag nested calls (e.g. ROMIO's ufs ADIO driver
+    // calling pwrite/pread internally) instead of mistaking them for direct
+    // application POSIX I/O. Tracing stays on either way; only bandwidth-limit
+    // pacing decisions read this flag (see BW_LIMIT_LAYER).
+    // NOTE: only visible on the calling thread. MPI-IO actually transferred on a
+    // modified-MPICH-spawned worker thread (true async execution) is not tagged.
+    inline thread_local bool in_mpi_io_call = false;
+
+    class MPIIOCallGuard
+    {
+    public:
+        MPIIOCallGuard() { in_mpi_io_call = true; }
+        ~MPIIOCallGuard() { in_mpi_io_call = false; }
+        MPIIOCallGuard(const MPIIOCallGuard &) = delete;
+        MPIIOCallGuard &operator=(const MPIIOCallGuard &) = delete;
+    };
+}
+
 //! debug
 void Function_Debug(std::string function_name, int flag = 0);
 
